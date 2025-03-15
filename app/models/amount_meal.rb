@@ -1,0 +1,2 @@
+class AmountMeal < ApplicationRecord
+end
