@@ -2,7 +2,7 @@ source "https://rubygems.org"
 ruby "3.2.3"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 7.2.0", ">= 7.0.4.3"
+gem "rails", "~> 8.0.2"
 gem "pg" 
 gem 'rack-cors'
 gem 'devise' # Autenticação
