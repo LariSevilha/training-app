@@ -5,7 +5,10 @@ ruby "3.2.3"
 gem "rails", "~> 7.2.0", ">= 7.0.4.3"
 gem "pg" 
 gem 'rack-cors'
-
+gem 'devise' # Autenticação
+gem 'devise-jwt' # Tokens JWT para autenticação na API
+gem 'pundit' # Autorização
+gem 'active_model_serializers' # Serialização de JSON
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]

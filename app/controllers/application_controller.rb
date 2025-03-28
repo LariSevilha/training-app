@@ -1,2 +1,5 @@
+ 
 class ApplicationController < ActionController::API
-end
+  include Devise::Controllers::Helpers
+end 
+

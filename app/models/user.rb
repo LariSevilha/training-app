@@ -1,4 +1,4 @@
 class User < ApplicationRecord
-  belongs_to :user_type
-  has_secure_password
+  devise :database_authenticatable, :registerable, :jwt_authenticatable, jwt_revocation_strategy: Devise::JWT::RevocationStrategies::SelfDestruct
+  enum role: { master: 0, regular: 1 }
 end
