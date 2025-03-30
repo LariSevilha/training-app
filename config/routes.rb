@@ -1,30 +1,15 @@
 Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
+
+  devise_for :users, skip: :all
+
   namespace :api do
     namespace :v1 do
-      resources :user_types
-      resources :users
-      resources :meals
-      resources :comidas
-      resources :foods
-      resources :amount_meals
-      resources :series
-      resources :repeats
-      resources :exercises
-      resources :trainings
-      get 'profile', to: 'users#profile', as: :user_profile
-      post 'login', to: 'authentication#login', as: :login
-      post 'register', to: 'authentication#register', as: :register
-      get 'logout', to: 'authentication#logout', as: :logout
-      get 'user/:user_id/trainings', to: 'trainings#user_trainings', as: :user_trainings
-      get 'exercises/search/:keyword', to: 'exercises#search', as: :search_exercises
-      get 'exercises/video/:id', to: 'exercises#video', as: :exercise_video
-      get 'user/:user_id/meals', to: 'meals#user_meals', as: :user_meals
-      get 'meal-plans/weekly', to: 'meals#weekly_plan', as: :weekly_meal_plan
-      get 'comidas/search/:keyword', to: 'comidas#search', as: :search_comidas
-      get 'dashboard/:user_id', to: 'dashboard#index', as: :dashboard
-      get 'reports/progress/:user_id', to: 'reports#progress', as: :progress_report
-      get 'reports/nutrition/:user_id', to: 'reports#nutrition', as: :nutrition_report
+      post 'users/sign_in', to: 'sessions#create', as: :user_login
+      get 'dashboard', to: 'dashboard#index', as: :dashboard
+      resources :users, only: [:index, :create]
+      resources :trainings, only: [:index, :create]
+      resources :meals, only: [:index, :create]
     end
   end
 end

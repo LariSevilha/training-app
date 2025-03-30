@@ -1,6 +1,7 @@
 module Api
   module V1
     class AuthenticationController < ApplicationController
+      # Pule a autenticação para ações públicas
       skip_before_action :authenticate_user!, only: [:login, :register], raise: false
 
       def login

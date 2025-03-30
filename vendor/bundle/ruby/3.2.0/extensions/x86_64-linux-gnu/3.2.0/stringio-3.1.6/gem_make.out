@@ -1,0 +1,18 @@
+current directory: /home/lari/Documentos/tcc/training_app/vendor/bundle/ruby/3.2.0/gems/stringio-3.1.6/ext/stringio
+/usr/bin/ruby3.2 -I/usr/lib/ruby/vendor_ruby extconf.rb
+creating Makefile
+
+current directory: /home/lari/Documentos/tcc/training_app/vendor/bundle/ruby/3.2.0/gems/stringio-3.1.6/ext/stringio
+make DESTDIR\= sitearchdir\=./.gem.20250329-13983-zxh2gk sitelibdir\=./.gem.20250329-13983-zxh2gk clean
+
+current directory: /home/lari/Documentos/tcc/training_app/vendor/bundle/ruby/3.2.0/gems/stringio-3.1.6/ext/stringio
+make DESTDIR\= sitearchdir\=./.gem.20250329-13983-zxh2gk sitelibdir\=./.gem.20250329-13983-zxh2gk
+compiling stringio.c
+linking shared-object stringio.so
+
+current directory: /home/lari/Documentos/tcc/training_app/vendor/bundle/ruby/3.2.0/gems/stringio-3.1.6/ext/stringio
+make DESTDIR\= sitearchdir\=./.gem.20250329-13983-zxh2gk sitelibdir\=./.gem.20250329-13983-zxh2gk install
+/usr/bin/install -c -m 0755 stringio.so ./.gem.20250329-13983-zxh2gk
+
+current directory: /home/lari/Documentos/tcc/training_app/vendor/bundle/ruby/3.2.0/gems/stringio-3.1.6/ext/stringio
+make DESTDIR\= sitearchdir\=./.gem.20250329-13983-zxh2gk sitelibdir\=./.gem.20250329-13983-zxh2gk clean
