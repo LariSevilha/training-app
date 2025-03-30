@@ -2,7 +2,6 @@ class User < ApplicationRecord
   devise :database_authenticatable, :registerable
 
   enum :role, { master: 0, regular: 1 }, default: :regular
-
   has_many :trainings, dependent: :destroy
   has_many :meals, dependent: :destroy
 
