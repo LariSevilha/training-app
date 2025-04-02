@@ -6,7 +6,7 @@ class CreateUsers < ActiveRecord::Migration[7.2]
       t.string :avatar
       t.integer :user_type  
       t.integer :role
- 
+      t.string :device_token
 
       t.timestamps
     end

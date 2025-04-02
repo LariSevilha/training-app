@@ -1,21 +1,26 @@
 class ApplicationController < ActionController::API
-  before_action :authenticate_with_api_key # Sem except, cada controlador define suas exceções
+  include ActionController::HttpAuthentication::Token::ControllerMethods
 
-  def current_user
-    @current_user ||= User.find_by(api_key: request.headers['X-API-Key'])
-  end
-
-  def ensure_master
-    unless current_user&.role == 'master'
-      render json: { error: 'Acesso restrito ao Master' }, status: :forbidden
-    end
-  end
-
-  private
+  before_action :authenticate_with_api_key, except: [:login]
 
   def authenticate_with_api_key
-    unless current_user
-      render json: { error: 'Chave API inválida ou ausente' }, status: :unauthorized
+    authenticate_or_request_with_http_token do |token, options|
+      api_key = ApiKey.active.find_by(token: token)
+      if api_key
+        @current_user = api_key.user
+        @current_device_id = request.headers['Device-ID']
+        if @current_device_id && api_key.device_id != @current_device_id
+          render json: { error: "Device ID mismatch" }, status: :unauthorized
+          return false
+        end
+        @current_user
+      else
+        false
+      end
     end
+  end
+
+  def current_user
+    @current_user
   end
 end
