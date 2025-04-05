@@ -6,7 +6,8 @@ gem "pg"
 gem 'rack-cors'
 gem 'devise'  
 gem 'pundit'
-gem 'active_model_serializers'
+gem 'jwt'
+gem 'active_model_serializers', '~> 0.10.0'
 gem "puma", ">= 6.0"
 gem 'bcrypt', '~> 3.1.7' 
 gem "tzinfo-data", platforms: %i[ windows jruby ]

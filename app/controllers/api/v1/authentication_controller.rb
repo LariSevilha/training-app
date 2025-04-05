@@ -1,46 +1,29 @@
-module Api
-  module V1
-    class AuthenticationController < ApplicationController
-      # Pule a autenticação para ações públicas
-      skip_before_action :authenticate_user!, only: [:login, :register], raise: false
+class Api::V1::AuthenticationController < ApplicationController
+  skip_before_action :verify_authenticity_token
 
-      def login
-        user = User.find_by(email: params[:email])
-        if user && user.valid_password?(params[:password])
-          # Gerar o token JWT
-          token_data = Warden::JWTAuth::UserEncoder.new.call(user, :user, nil)
-          # Extrair apenas o token codificado (primeiro elemento do array)
-          token = token_data.is_a?(Array) ? token_data.first : token_data
-          render json: { token: token }, status: :ok
-        else
-          render json: { error: 'Credenciais inválidas' }, status: :unauthorized
-        end
-      rescue StandardError => e
-        render json: { error: "Erro interno: #{e.message}" }, status: :internal_server_error
-      end
-
-      def register
-        user = User.new(user_params)
-        user.role = :regular unless params[:role] == 'master'
-        if user.save
-          token_data = Warden::JWTAuth::UserEncoder.new.call(user, :user, nil)
-          token = token_data.is_a?(Array) ? token_data.first : token_data
-          render json: { token: token }, status: :created
-        else
-          render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
-        end
-      end
-
-      def logout
-        Warden::JWTAuth::UserDecoder.new.call(request.headers['Authorization'].split.last)
-        head :no_content
-      end
-
-      private
-
-      def user_params
-        params.permit(:email, :password, :name, :age, :weight, :height, :fitness_level)
-      end
+  def login
+    user = User.find_by(email: params[:email])
+    if user&.valid_password?(params[:password])
+      token = JWT.encode({ user_id: user.id, exp: 24.hours.from_now.to_i }, 'sua_chave_secreta')
+      render json: { token: token, user: user.as_json(only: [:id, :email, :name, :user_type]) }, status: :ok
+    else
+      render json: { error: 'Credenciais inválidas' }, status: :unauthorized
     end
+  end
+
+  def register
+    user = User.new(user_params)
+    if user.save
+      token = JWT.encode({ user_id: user.id, exp: 24.hours.from_now.to_i }, 'sua_chave_secreta')
+      render json: { token: token, user: user.as_json(only: [:id, :email, :name, :user_type]) }, status: :created
+    else
+      render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  private
+
+  def user_params
+    params.permit(:email, :password, :name, :age, :weight, :height, :fitness_level, :user_type)
   end
 end

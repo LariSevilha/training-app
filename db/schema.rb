@@ -32,10 +32,9 @@ ActiveRecord::Schema[7.2].define(version: 2025_04_01_235200) do
   end
 
   create_table "comidas", force: :cascade do |t|
-    t.string "name"
-    t.string "amount"
-    t.integer "amount_meal_id"
     t.bigint "meal_id", null: false
+    t.string "name", null: false
+    t.integer "amount", default: 0
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["meal_id"], name: "index_comidas_on_meal_id"
@@ -49,10 +48,10 @@ ActiveRecord::Schema[7.2].define(version: 2025_04_01_235200) do
   end
 
   create_table "meals", force: :cascade do |t|
-    t.string "meal_type"
+    t.bigint "user_id", null: false
+    t.string "meal_type", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.bigint "user_id", null: false
     t.index ["user_id"], name: "index_meals_on_user_id"
   end
 
@@ -70,14 +69,12 @@ ActiveRecord::Schema[7.2].define(version: 2025_04_01_235200) do
 
   create_table "trainings", force: :cascade do |t|
     t.bigint "user_id", null: false
-    t.bigint "serie_id", null: false
-    t.bigint "repeat_id", null: false
-    t.bigint "exercise_id", null: false
+    t.string "exercise_name", null: false
+    t.integer "serie_amount", default: 0
+    t.integer "repeat_amount", default: 0
+    t.string "video"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["exercise_id"], name: "index_trainings_on_exercise_id"
-    t.index ["repeat_id"], name: "index_trainings_on_repeat_id"
-    t.index ["serie_id"], name: "index_trainings_on_serie_id"
     t.index ["user_id"], name: "index_trainings_on_user_id"
   end
 
@@ -88,6 +85,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_04_01_235200) do
     t.integer "user_type"
     t.integer "role"
     t.string "device_token"
+    t.boolean "blocked", default: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "email", default: "", null: false
@@ -95,10 +93,8 @@ ActiveRecord::Schema[7.2].define(version: 2025_04_01_235200) do
     t.string "reset_password_token"
     t.datetime "reset_password_sent_at"
     t.datetime "remember_created_at"
-    t.string "api_key"
     t.string "active_device_id"
     t.string "password_digest"
-    t.index ["api_key"], name: "index_users_on_api_key", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
@@ -106,8 +102,5 @@ ActiveRecord::Schema[7.2].define(version: 2025_04_01_235200) do
   add_foreign_key "api_keys", "users"
   add_foreign_key "comidas", "meals"
   add_foreign_key "meals", "users"
-  add_foreign_key "trainings", "exercises"
-  add_foreign_key "trainings", "repeats"
-  add_foreign_key "trainings", "series"
   add_foreign_key "trainings", "users"
 end

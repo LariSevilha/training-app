@@ -7,6 +7,7 @@ class CreateUsers < ActiveRecord::Migration[7.2]
       t.integer :user_type  
       t.integer :role
       t.string :device_token
+      t.boolean :blocked, default: false
 
       t.timestamps
     end

@@ -380,6 +380,7 @@ DEPENDENCIES
   debug
   devise
   fcm
+  jwt
   kamal
   pg
   puma (>= 6.0)

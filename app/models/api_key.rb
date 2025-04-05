@@ -1,10 +1,13 @@
 class ApiKey < ApplicationRecord
-    belongs_to :user
-  
-    validates :token, presence: true, uniqueness: true
-    validates :device_id, presence: true
-  
-    attribute :active, :boolean, default: true
-  
-    scope :active, -> { where(active: true) }
+  belongs_to :user
+  before_create :generate_token
+
+  scope :active, -> { where(active: true) }
+
+  private
+
+  def generate_token
+    self.token = SecureRandom.uuid
+    self.active = true
   end
+end
