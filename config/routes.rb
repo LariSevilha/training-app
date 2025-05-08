@@ -1,14 +1,14 @@
 Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
 
-  devise_for :users, skip: :all
-
   namespace :api do
     namespace :v1 do
       post 'users/sign_in', to: 'sessions#create', as: :user_login
-      get 'dashboard', to: 'dashboard#index', as: :dashboard
       post 'sessions', to: 'sessions#create', as: :session_create
-
+      get 'planilha', to: 'planilhas#show', as: :planilha
+      delete 'sessions', to: 'sessions#destroy', as: :session_destroy
+      get 'dashboard', to: 'dashboard#index', as: :dashboard
+      get 'planilha', to: 'users#planilha', as: :planilhas
       resources :users do
         collection do
           post :login
@@ -24,4 +24,3 @@ Rails.application.routes.draw do
     end
   end
 end
- 

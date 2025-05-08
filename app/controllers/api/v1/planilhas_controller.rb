@@ -1,30 +1,48 @@
 module Api
-    module V1
-      class PlanilhasController < ApplicationController
-        skip_before_action :verify_authenticity_token
-  
-        def show
-          user = User.joins(:api_keys).find_by(api_keys: { token: extract_token, device_id: request.headers['Device-ID'], active: true })
-          if user
-            render json: {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
-              trainings: user.trainings || [],
-              meals: user.meals || [],
-              error: nil
-            }, status: :ok
-          else
-            render json: { error: "Usuário não autorizado" }, status: :unauthorized
-          end
+  module V1
+    class PlanilhasController < ApplicationController
+      before_action :authenticate_with_api_key
+
+      def show
+        user = @current_user
+        render json: {
+          name: user.name || user.email,
+          trainings: user.trainings.map do |training|
+            {
+              exercise_name: training.exercise_name || "Sem nome",
+              serie_amount: training.serie_amount.to_i, # Converter para inteiro
+              repeat_amount: training.repeat_amount.to_i, # Converter para inteiro
+              video: training.video.presence
+            }
+          end,
+          meals: user.meals.map do |meal|
+            {
+              meal_type: meal.meal_type || "Sem tipo",
+              comidas: meal.comidas || [] # Garantir que comidas seja um array vazio se nulo
+            }
+          end,
+          error: nil
+        }, status: :ok
+      rescue StandardError => e
+        render json: { error: "Erro ao carregar a planilha: #{e.message}" }, status: :internal_server_error
+      end
+
+      private
+
+      def authenticate_with_api_key
+        api_key = request.headers['Authorization']&.split(' ')&.last
+        device_id = request.headers['Device-ID']
+        unless api_key && device_id
+          render json: { error: 'API key e device_id são obrigatórios' }, status: :unauthorized
+          return
         end
-  
-        private
-  
-        def extract_token
-          request.headers['Authorization']&.split(' ')&.last
+        @current_api_key = ApiKey.active.find_by(token: api_key, device_id: device_id)
+        unless @current_api_key
+          render json: { error: 'API key inválida ou inativa' }, status: :unauthorized
+          return
         end
+        @current_user = @current_api_key.user
       end
     end
   end
+end

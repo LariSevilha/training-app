@@ -1,6 +1,7 @@
 class Api::V1::UsersController < ApplicationController
   before_action :ensure_master, only: [:create, :update, :destroy, :unblock]
   before_action :set_user, only: [:show, :update, :destroy, :unblock]
+  skip_before_action :authenticate_with_api_key, only: :login  
   respond_to :json
 
   def index
@@ -75,39 +76,55 @@ class Api::V1::UsersController < ApplicationController
   end
 
   def login
-    user_params = params[:user] || {}
-    email = user_params[:email]
-    password = user_params[:password]
-    device_id = user_params[:device_id]
-
+    email = params[:email] || params.dig(:user, :email)
+    password = params[:password] || params.dig(:user, :password)
+    device_id = params[:device_id] || params.dig(:user, :device_id)
+  
+    Rails.logger.info("Parâmetros processados: email='#{email}', device_id='#{device_id}'")
+  
     unless email && password && device_id
+      Rails.logger.info("Parâmetros ausentes. Email: #{email}, Password: #{password}, Device_id: #{device_id}")
       render json: { error: 'Email, senha e device_id são obrigatórios' }, status: :bad_request
       return
     end
-
-    user = User.find_by(email: email)
+  
+    user = User.find_by("LOWER(email) = ?", email.downcase)
     unless user
       render json: { error: 'Credenciais inválidas' }, status: :unauthorized
       return
     end
-
+  
     if user.authenticate(password) && !user.blocked
       existing_api_key = user.api_keys.active.find_by(device_id: device_id)
       if existing_api_key
-        render json: { api_key: existing_api_key.token, user: { id: user.id, email: user.email, role: user.role } }, status: :ok
+        render json: {
+          api_key: existing_api_key.token,
+          device_id: device_id,
+          user_role: user.role,
+          error: nil
+        }, status: :ok
         return
       end
-
-      if user.api_keys.active.exists? && user.api_keys.active.where.not(device_id: device_id).exists?
-        notify_master_of_duplicate_login(user)
-        user.block_account!
-        render json: { error: 'Conta bloqueada devido a acesso simultâneo' }, status: :unauthorized
-        return
+  
+      # Ignorar bloqueio por acesso simultâneo para usuário master
+      unless user.master?
+        if user.api_keys.active.exists? && user.api_keys.active.where.not(device_id: device_id).exists?
+          notify_master_of_duplicate_login(user)
+          user.block_account!
+          render json: { error: 'Conta bloqueada devido a acesso simultâneo' }, status: :unauthorized
+          return
+        end
       end
-
+  
       api_key = user.api_keys.create!(device_id: device_id, token: SecureRandom.uuid)
-      render json: { api_key: api_key.token, user: { id: user.id, email: user.email, role: user.role } }, status: :ok
+      render json: {
+        api_key: api_key.token,
+        device_id: device_id,
+        user_role: user.role,
+        error: nil
+      }, status: :ok
     else
+      Rails.logger.info("Falha na autenticação ou conta bloqueada. Blocked: #{user.blocked}")
       render json: { error: 'Credenciais inválidas ou conta bloqueada' }, status: :unauthorized
     end
   end
@@ -115,32 +132,15 @@ class Api::V1::UsersController < ApplicationController
   def planilha
     user = User.find_by(api_key: params[:api_key])
     if user && user.role == 'regular' && !user.blocked
-      render html: <<-HTML.html_safe
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Planilha</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { color: #333; }
-            h2 { color: #555; }
-            ul { list-style-type: none; padding: 0; }
-            li { margin: 10px 0; }
-          </style>
-        </head>
-        <body>
-          <h1>Planilha de #{user.name}</h1>
-          <h2>Treinos</h2>
-          <ul>
-            #{user.trainings.map { |t| "<li>#{t.exercise_name}: #{t.serie_amount} séries, #{t.repeat_amount} repetições</li>" }.join}
-          </ul>
-          <h2>Dietas</h2>
-          <ul>
-            #{user.meals.map { |m| "<li>#{m.meal_type}: #{m.comidas.map { |c| "#{c.name} (#{c.amount})" }.join(', ')}</li>" }.join}
-          </ul>
-        </body>
-        </html>
-      HTML
+      render json: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        trainings: user.trainings.as_json(only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video]),
+        meals: user.meals.as_json(only: [:id, :meal_type], include: { comidas: { only: [:id, :name, :amount] } }),
+        error: nil
+      }, status: :ok
     else
       render json: { error: 'Acesso não autorizado' }, status: :unauthorized
     end
