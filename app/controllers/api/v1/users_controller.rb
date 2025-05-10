@@ -19,7 +19,7 @@ class Api::V1::UsersController < ApplicationController
     render json: @user.as_json(
       only: [:id, :name, :email, :role],
       include: {
-        trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday] },
+        trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday, :photos_urls] },
         meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } }          
        }
     ), status: :ok
@@ -51,7 +51,7 @@ class Api::V1::UsersController < ApplicationController
       render json: @user.as_json(
         only: [:id, :name, :email, :role],
         include: {
-          trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video] },
+          trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :photos_urls] },
           meals: { only: [:id, :meal_type], include: { comidas: { only: [:id, :name, :amount] } } }
         }
       ), status: :ok
@@ -150,10 +150,17 @@ class Api::V1::UsersController < ApplicationController
   def user_params
     params.require(:user).permit(
       :name, :email, :password, :role,
-      trainings_attributes: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday, :_destroy],
-      meals_attributes: [:id, :meal_type, :weekday, :_destroy, comidas_attributes: [:id, :name, :amount, :_destroy]]
+      trainings_attributes: [
+        :id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday, :_destroy, 
+        photos: [], 
+        training_photos_attributes: [:id, :image_url, :_destroy]
+      ],
+      meals_attributes: [
+        :id, :meal_type, :weekday, :_destroy, 
+        comidas_attributes: [:id, :name, :amount, :_destroy]
+      ]
     )
-  end  
+  end
 
   def notify_master_of_duplicate_login(user)
     master = User.find_by(role: :master)
