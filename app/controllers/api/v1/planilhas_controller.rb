@@ -9,18 +9,20 @@ module Api
           name: user.name || user.email,
           trainings: user.trainings.map do |training|
             {
-              exercise_name: training.exercise_name || "Sem nome",
-              serie_amount: training.serie_amount.to_i, # Converter para inteiro
-              repeat_amount: training.repeat_amount.to_i, # Converter para inteiro
-              video: training.video.presence
+              exercise_name: training.exercise_name,
+              serie_amount: training.serie_amount.to_i,
+              repeat_amount: training.repeat_amount.to_i,
+              video: training.video,
+              weekday: training.weekday
             }
           end,
           meals: user.meals.map do |meal|
             {
-              meal_type: meal.meal_type || "Sem tipo",
-              comidas: meal.comidas || [] # Garantir que comidas seja um array vazio se nulo
+              meal_type: meal.meal_type,
+              weekday: meal.weekday,
+              comidas: meal.comidas
             }
-          end,
+          end
           error: nil
         }, status: :ok
       rescue StandardError => e

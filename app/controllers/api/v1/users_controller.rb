@@ -19,15 +19,15 @@ class Api::V1::UsersController < ApplicationController
     render json: @user.as_json(
       only: [:id, :name, :email, :role],
       include: {
-        trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video] },
-        meals: { only: [:id, :meal_type], include: { comidas: { only: [:id, :name, :amount] } } }
-      }
+        trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday] },
+        meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } }          
+       }
     ), status: :ok
   end
 
   def create
     user = User.new(user_params)
-    user.role = :regular # Forçar role como regular para novos usuários
+    user.role = :regular 
   
     if user.save
       render json: user.as_json(
@@ -37,14 +37,9 @@ class Api::V1::UsersController < ApplicationController
           meals: { only: [:id, :meal_type], include: { comidas: { only: [:id, :name, :amount] } } }
         }
       ), status: :created
-    else
-      # Adicionar mais detalhes aos erros para depuração
-      Rails.logger.info("Erros de validação: #{user.errors.full_messages}")
-      Rails.logger.info("Usuário: #{user.inspect}")
-      user.meals.each do |meal|
-        Rails.logger.info("Meal: #{meal.inspect}")
-        meal.comidas.each do |comida|
-          Rails.logger.info("Comida: #{comida.inspect}")
+    else  
+      user.meals.each do |meal| 
+        meal.comidas.each do |comida| 
         end
       end
       render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
@@ -155,10 +150,10 @@ class Api::V1::UsersController < ApplicationController
   def user_params
     params.require(:user).permit(
       :name, :email, :password, :role,
-      trainings_attributes: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :_destroy],
-      meals_attributes: [:id, :meal_type, :_destroy, comidas_attributes: [:id, :name, :amount, :_destroy]]
+      trainings_attributes: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday, :_destroy],
+      meals_attributes: [:id, :meal_type, :weekday, :_destroy, comidas_attributes: [:id, :name, :amount, :_destroy]]
     )
-  end
+  end  
 
   def notify_master_of_duplicate_login(user)
     master = User.find_by(role: :master)

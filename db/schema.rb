@@ -43,6 +43,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_04_10_010426) do
 
   create_table "meals", force: :cascade do |t|
     t.string "meal_type"
+    t.integer "weekday", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
@@ -51,6 +52,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_04_10_010426) do
 
   create_table "trainings", force: :cascade do |t|
     t.bigint "user_id", null: false
+    t.integer "weekday", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "serie_amount"
