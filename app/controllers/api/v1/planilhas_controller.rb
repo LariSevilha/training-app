@@ -22,7 +22,7 @@ module Api
               weekday: meal.weekday,
               comidas: meal.comidas
             }
-          end
+          end,
           error: nil
         }, status: :ok
       rescue StandardError => e
