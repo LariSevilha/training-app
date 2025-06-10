@@ -9,11 +9,15 @@ class User < ApplicationRecord
   accepts_nested_attributes_for :trainings, allow_destroy: true
   accepts_nested_attributes_for :meals, allow_destroy: true
 
-  before_save :set_dates 
- 
+  before_save :set_dates
+
   enum :role, { master: 0, regular: 1 }, default: :regular
   validates :email, presence: true, uniqueness: true
   validates :name, presence: true
+  # validates :phone_number, presence: true, format: { with: /\A\+?\d{10,15}\z/, message: "deve ser um número válido (ex.: +5511999999999)" }
+  validates :plan_duration, inclusion: { in: %w[monthly semi_annual annual], allow_nil: true }
+  validates :plan_type, inclusion: { in: %w[manual pdf], allow_nil: true }
+
   attribute :blocked, :boolean, default: false
 
   def block_account!
@@ -24,8 +28,8 @@ class User < ApplicationRecord
     update!(blocked: false)
   end
 
- def expired?
-    return false if role == 'master'  
+  def expired?
+    return false if role == 'master'
     expiration_date.present? && expiration_date < Time.current
   end
 
@@ -33,6 +37,15 @@ class User < ApplicationRecord
 
   def set_dates
     self.registration_date ||= Time.current
-    self.expiration_date = registration_date + 1.month
+    case plan_duration
+    when 'annual'
+      self.expiration_date = registration_date + 12.months
+    when 'semi_annual'
+      self.expiration_date = registration_date + 6.months
+    when 'monthly'
+      self.expiration_date = registration_date + 1.month
+    else
+      self.expiration_date = registration_date + 1.month  
+    end
   end
 end

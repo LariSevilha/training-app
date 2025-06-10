@@ -5,18 +5,20 @@ class ApplicationController < ActionController::API
 
   def authenticate_with_api_key
     authenticate_or_request_with_http_token do |token, _options|
+      Rails.logger.info("Authenticating with token: #{token}")
       api_key = ApiKey.active.find_by(token: token)
       if api_key
         @current_user = api_key.user
         @current_device_id = request.headers['Device-ID']
+        Rails.logger.info("Device-ID received: #{@current_device_id}, Expected: #{api_key.device_id}")
         if @current_device_id && api_key.device_id != @current_device_id
-          render json: { error: "Device ID mismatch" }, status: :unauthorized
-          return false
+          Rails.logger.warn("Device ID mismatch for token: #{token}")
+          render json: { error: 'Device ID mismatch' }, status: :unauthorized and return false
         end
         true
       else
-        render json: { error: "Unauthorized" }, status: :unauthorized
-        false
+        Rails.logger.warn("No active API key found for token: #{token}")
+        render json: { error: 'Unauthorized' }, status: :unauthorized and return false
       end
     end
   end
@@ -29,7 +31,7 @@ class ApplicationController < ActionController::API
 
   def ensure_master
     unless current_user&.role == 'master'
-      render json: { error: 'Apenas o master pode realizar esta ação' }, status: :forbidden
+      render json: { error: 'Apenas o master pode realizar esta ação' }, status: :forbidden and return
     end
   end
 end

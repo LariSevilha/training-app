@@ -7,6 +7,7 @@ class CreateTrainings < ActiveRecord::Migration[7.2]
       t.references :exercise, null: false, foreign_key: true
       t.integer :weekday, null: false, default: 0
       t.text :description 
+      t.string :photo
       t.timestamps
     end
   end

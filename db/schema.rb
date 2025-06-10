@@ -50,12 +50,13 @@ ActiveRecord::Schema[7.2].define(version: 2025_05_14_013839) do
 
   create_table "api_keys", force: :cascade do |t|
     t.bigint "user_id", null: false
-    t.string "token", null: false
     t.string "device_id", null: false
-    t.boolean "active", default: true, null: false
+    t.string "token", null: false
+    t.boolean "active", default: true
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["token"], name: "index_api_keys_on_token", unique: true
+    t.index ["user_id", "device_id"], name: "index_api_keys_on_user_id_and_device_id", unique: true
     t.index ["user_id"], name: "index_api_keys_on_user_id"
   end
 
@@ -90,6 +91,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_05_14_013839) do
     t.bigint "user_id", null: false
     t.integer "weekday", default: 0, null: false
     t.text "description"
+    t.string "photo"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "serie_amount"
@@ -106,6 +108,9 @@ ActiveRecord::Schema[7.2].define(version: 2025_05_14_013839) do
     t.integer "user_type"
     t.integer "role"
     t.string "device_token"
+    t.string "phone_number", default: "", null: false
+    t.string "plan_duration"
+    t.string "plan_type"
     t.datetime "registration_date"
     t.datetime "expiration_date"
     t.datetime "created_at", null: false

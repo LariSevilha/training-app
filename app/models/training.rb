@@ -1,7 +1,7 @@
 class Training < ApplicationRecord
   belongs_to :user
   has_many_attached :photos
-  validates :description, length: { maximum: 1000 }, allow_blank: true  
+  # validates :description, length: { maximum: 1000 }, allow_blank: true  
   enum weekday: {
     sunday: 0,
     monday: 1,
@@ -13,7 +13,7 @@ class Training < ApplicationRecord
   }
 
 
-  def photos_urls
-    photos.map { |photo| Rails.application.routes.url_helpers.rails_blob_url(photo, only_path: true) }
+  def photo_urls
+    photos.attached? ? photos.map { |photo| Rails.application.routes.url_helpers.url_for(photo) } : []
   end
 end
