@@ -5,27 +5,34 @@ module Api
 
       def show
         user = @current_user
+        Rails.logger.info("Carregando planilha para usuário: #{user.id}, nome: #{user.name || user.email}")
+        
+        trainings_data = user.trainings.map do |training|
+          {
+            exercise_name: training.exercise_name,
+            serie_amount: training.serie_amount&.to_i || 0,
+            repeat_amount: training.repeat_amount&.to_i || 0,
+            video: training.video,
+            weekday: training.weekday
+          }
+        end
+        
+        meals_data = user.meals.map do |meal|
+          {
+            meal_type: meal.meal_type,
+            weekday: meal.weekday,
+            comidas: meal.comidas
+          }
+        end
+        
         render json: {
           name: user.name || user.email,
-          trainings: user.trainings.map do |training|
-            {
-              exercise_name: training.exercise_name,
-              serie_amount: training.serie_amount.to_i,
-              repeat_amount: training.repeat_amount.to_i,
-              video: training.video,
-              weekday: training.weekday
-            }
-          end,
-          meals: user.meals.map do |meal|
-            {
-              meal_type: meal.meal_type,
-              weekday: meal.weekday,
-              comidas: meal.comidas
-            }
-          end,
+          trainings: trainings_data,
+          meals: meals_data,
           error: nil
         }, status: :ok
       rescue StandardError => e
+        Rails.logger.error("Erro ao carregar planilha: #{e.message}\nBacktrace: #{e.backtrace.join("\n")}")
         render json: { error: "Erro ao carregar a planilha: #{e.message}" }, status: :internal_server_error
       end
 

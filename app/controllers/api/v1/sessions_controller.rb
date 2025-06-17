@@ -1,4 +1,3 @@
- 
 module Api
   module V1
     class SessionsController < ApplicationController
@@ -28,24 +27,23 @@ module Api
         end
 
         if user.authenticate(password) && !user.blocked
-          existing_api_key = user.api_keys.active.find_by(device_id: device_id)
-          if existing_api_key
-            render json: {
-              api_key: existing_api_key.token,
-              role: user.role,
-              message: 'Login realizado com sucesso'
-            }, status: :ok and return
+          # Verifica ou cria/update ApiKey para o device_id atual
+          api_key = user.api_keys.find_or_initialize_by(device_id: device_id) do |key|
+            key.token = SecureRandom.uuid
+            key.active = true
           end
+          api_key.update!(token: SecureRandom.uuid, active: true) unless api_key.persisted? || api_key.active?
 
+          # Verifica múltiplos dispositivos para usuários não-master
           unless user.master?
-            if user.api_keys.active.exists? && user.api_keys.active.where.not(device_id: device_id).exists?
+            active_devices = user.api_keys.active.where.not(id: api_key.id).pluck(:device_id)
+            if active_devices.present? && active_devices.exclude?(device_id)
               notify_master_of_duplicate_login(user)
               user.block_account!
               render json: { error: 'Conta bloqueada devido a acesso simultâneo' }, status: :unauthorized and return
             end
           end
 
-          api_key = user.api_keys.create!(device_id: device_id, token: SecureRandom.uuid)
           render json: {
             api_key: api_key.token,
             role: user.role,
@@ -60,15 +58,15 @@ module Api
       def destroy
         api_key = request.headers['Authorization']&.split(' ')&.last
         device_id = request.headers['Device-ID']
-
+      
         unless api_key && device_id
           render json: { error: 'API key e device_id são obrigatórios' }, status: :bad_request and return
         end
-
-        key = ApiKey.active.find_by(token: api_key, device_id: device_id)
+      
+        key = ApiKey.find_by(token: api_key, device_id: device_id)
         if key
           key.update(active: false)
-          render json: { message: 'Sessão encerrada com sucesso' }, status: :ok
+          render json: { message: 'Sessão encerrada com sucesso', invalidate_token: true }, status: :ok
         else
           render json: { error: 'Sessão inválida' }, status: :unauthorized
         end
@@ -91,4 +89,4 @@ module Api
       end
     end
   end
-end 
+end
