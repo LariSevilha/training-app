@@ -1,3 +1,4 @@
+# app/controllers/api/v1/users_controller.rb
 class Api::V1::UsersController < ApplicationController
   before_action :ensure_master, only: [:index, :show, :create, :update, :destroy, :unblock]
   before_action :set_user, only: [:show, :update, :destroy, :unblock]
@@ -30,9 +31,6 @@ class Api::V1::UsersController < ApplicationController
     user = User.new(user_params)
     user.role = :regular
     Rails.logger.info "Parâmetros recebidos: #{user_params.inspect}"
-    if user_params[:weekly_pdfs_attributes].present?
-      user.weekly_pdfs.destroy_all # Garante apenas um PDF
-    end
     if user.save
       WhatsappService.send_confirmation(user)
       render json: user.as_json(
@@ -50,10 +48,20 @@ class Api::V1::UsersController < ApplicationController
   end
 
   def update
-    if user_params[:weekly_pdfs_attributes].present?
-      @user.weekly_pdfs.destroy_all # Garante apenas um PDF
+    # Remova destroy_all ou ajuste para preservar PDFs existentes se desejado
+    # Se quiser apenas um PDF, processe os atributos sem destruir tudo
+    attributes = user_params
+    if attributes[:weekly_pdfs_attributes].present?
+      @user.assign_attributes(attributes)
+      # Processar anexos antes de salvar
+      attributes[:weekly_pdfs_attributes].each do |pdf_attrs|
+        if pdf_attrs[:id].present?
+          pdf = @user.weekly_pdfs.find(pdf_attrs[:id])
+          pdf&.pdf&.purge if pdf_attrs[:_destroy] == 'true' # Remove apenas se marcado para destruir
+        end
+      end
     end
-    if @user.update(user_params)
+    if @user.save
       render json: @user.as_json(
         only: [:id, :name, :email, :role, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
         include: {
@@ -86,7 +94,7 @@ class Api::V1::UsersController < ApplicationController
         render json: { error: 'Conta expirada. Entre em contato com o administrador.' }, status: :unauthorized
         return
       end
-
+  
       response_data = {
         id: user.id,
         name: user.name,
@@ -105,20 +113,14 @@ class Api::V1::UsersController < ApplicationController
           only: [:id, :meal_type, :weekday],
           include: { comidas: { only: [:id, :name, :amount] } }
         ),
-        weekly_pdfs: user.weekly_pdfs.as_json(only: [:id, :weekday, :pdf_url])
+        weekly_pdfs: user.weekly_pdfs.as_json(only: [:id, :weekday, :pdf_url, :notes], methods: [:pdf_filename])
       }
-
-      global_pdf = user.weekly_pdfs.find { |pdf| pdf.weekday.nil? }
-      if global_pdf
-        response_data[:weekly_pdfs] = [{ id: global_pdf.id, weekday: nil, pdf_url: global_pdf.pdf_url }]
-      end
-
+  
       render json: response_data, status: :ok
     else
       render json: { error: 'Acesso não autorizado' }, status: :unauthorized
     end
   end
-
   private
 
   def set_user
@@ -159,5 +161,9 @@ class Api::V1::UsersController < ApplicationController
       }
       # Implementar envio de notificação, ex.: fcm.send([master.device_token], message)
     end
+  end
+
+  def ensure_master
+    render json: { error: 'Acesso não autorizado' }, status: :unauthorized unless current_user&.role == 'master'
   end
 end
