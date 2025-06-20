@@ -13,7 +13,8 @@ module Api
             serie_amount: training.serie_amount&.to_i || 0,
             repeat_amount: training.repeat_amount&.to_i || 0,
             video: training.video,
-            weekday: training.weekday
+            weekday: training.weekday,
+            photo_urls: training.photo_urls
           }
         end
         
@@ -21,14 +22,24 @@ module Api
           {
             meal_type: meal.meal_type,
             weekday: meal.weekday,
-            comidas: meal.comidas
+            comidas: meal.comidas.map { |c| { id: c.id, name: c.name, amount: c.amount } }
           }
         end
         
+        weekly_pdfs_data = user.weekly_pdfs.map do |pdf|
+          {
+            id: pdf.id,
+            weekday: pdf.weekday,
+            pdf_url: pdf.pdf_url,
+            pdf_filename: pdf.pdf_filename, 
+          }
+        end
+
         render json: {
           name: user.name || user.email,
           trainings: trainings_data,
           meals: meals_data,
+          weekly_pdfs: weekly_pdfs_data,
           error: nil
         }, status: :ok
       rescue StandardError => e

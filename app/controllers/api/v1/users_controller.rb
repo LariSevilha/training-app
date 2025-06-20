@@ -21,7 +21,7 @@ class Api::V1::UsersController < ApplicationController
       only: [:id, :name, :email, :role, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
       include: {
         trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
-        weekly_pdfs: { only: [:id, :weekday, :pdf_url, :notes], methods: [:pdf_filename] },
+        weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
         meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } }
       }
     ), status: :ok
@@ -37,7 +37,7 @@ class Api::V1::UsersController < ApplicationController
         only: [:id, :name, :email, :role, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
         include: {
           trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
-          weekly_pdfs: { only: [:id, :weekday, :pdf_url, :notes], methods: [:pdf_filename] },
+          weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
           meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } }
         }
       ), status: :created
@@ -66,7 +66,7 @@ class Api::V1::UsersController < ApplicationController
         only: [:id, :name, :email, :role, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
         include: {
           trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
-          weekly_pdfs: { only: [:id, :weekday, :pdf_url, :notes], methods: [:pdf_filename] },
+          weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
           meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } }
         }
       ), status: :ok
@@ -113,7 +113,7 @@ class Api::V1::UsersController < ApplicationController
           only: [:id, :meal_type, :weekday],
           include: { comidas: { only: [:id, :name, :amount] } }
         ),
-        weekly_pdfs: user.weekly_pdfs.as_json(only: [:id, :weekday, :pdf_url, :notes], methods: [:pdf_filename])
+        weekly_pdfs: user.weekly_pdfs.as_json(only: [:id, :weekday, :pdf_url], methods: [:pdf_filename])
       }
   
       render json: response_data, status: :ok
@@ -142,7 +142,7 @@ class Api::V1::UsersController < ApplicationController
         comidas_attributes: [:id, :name, :amount, :_destroy]
       ],
       weekly_pdfs_attributes: [
-        :id, :weekday, :pdf, :notes, :_destroy
+        :id, :weekday, :pdf, :_destroy
       ]
     )
   end
