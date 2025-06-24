@@ -31,10 +31,9 @@ class Api::V1::UsersController < ApplicationController
     user = User.new(user_params)
     user.role = :regular
     Rails.logger.info "Parâmetros recebidos: #{user_params.inspect}"
-    if user.save
-      WhatsappService.send_confirmation(user)
+    if user.save 
       render json: user.as_json(
-        only: [:id, :name, :email, :role, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
+        only: [:id, :name, :email, :role, :registration_date,  :plan_type, :plan_duration, :phone_number],
         include: {
           trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
           weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },

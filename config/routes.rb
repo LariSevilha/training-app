@@ -1,4 +1,4 @@
-Rails.application.routes.draw do
+Rails.application.routes.draw do 
   get "up" => "rails/health#show", as: :rails_health_check
 
   namespace :api do
@@ -10,6 +10,7 @@ Rails.application.routes.draw do
       
       delete 'sessions', to: 'sessions#destroy', as: :session_destroy
       post 'login', to: 'sessions#create', as: :login
+      post 'send-whatsapp', to: 'whatsapp#send_message'
 
       resources :users do
         collection do

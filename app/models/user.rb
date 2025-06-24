@@ -33,6 +33,9 @@ class User < ApplicationRecord
     expiration_date.present? && expiration_date < Time.current
   end
 
+  def expiration_date
+    object.expiration_date&.strftime("%Y-%m-%d") # Garante o formato YYYY-MM-DD
+  end
   private
 
   def set_dates
