@@ -19,11 +19,7 @@ module Api
         unless user
           render json: { error: 'Credenciais inválidas' }, status: :unauthorized and return
         end
-      
-        if user.expired?
-          user.block_account!
-          render json: { error: 'Conta expirada. Entre em contato com o administrador.' }, status: :unauthorized and return
-        end
+       
       
         if user.authenticate(password) && !user.blocked
           # Sempre gera/atualiza o ApiKey corretamente
