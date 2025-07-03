@@ -1,4 +1,3 @@
-# app/controllers/api/v1/users_controller.rb
 class Api::V1::UsersController < ApplicationController
   before_action :ensure_master, only: [:index, :show, :create, :update, :destroy, :unblock]
   before_action :set_user, only: [:show, :update, :destroy, :unblock]
@@ -7,7 +6,7 @@ class Api::V1::UsersController < ApplicationController
   def index
     users = User.where(role: 'regular').includes(:trainings, :weekly_pdfs, meals: :comidas)
     render json: users.as_json(
-      only: [:id, :name, :email, :role, :registration_date, :email, :plan_type, :plan_duration],
+      only: [:id, :name, :email, :role, :registration_date, :plan_type, :plan_duration],
       include: {
         trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
         weekly_pdfs: { only: [:id, :weekday, :pdf_url] },
@@ -33,7 +32,7 @@ class Api::V1::UsersController < ApplicationController
     Rails.logger.info "Parâmetros recebidos: #{user_params.inspect}"
     if user.save 
       render json: user.as_json(
-        only: [:id, :name, :email, :role, :registration_date,  :plan_type, :plan_duration, :phone_number],
+        only: [:id, :name, :email, :role, :registration_date, :plan_type, :plan_duration, :phone_number],
         include: {
           trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
           weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
@@ -46,23 +45,37 @@ class Api::V1::UsersController < ApplicationController
     end
   end
 
-   def update
+  def update
     attributes = user_params
     if attributes[:weekly_pdfs_attributes].present?
-      @user.assign_attributes(attributes)
-      attributes[:weekly_pdfs_attributes].each do |_, pdf_attrs| # Use `_` for the index/key
+      attributes[:weekly_pdfs_attributes].each do |_, pdf_attrs|
         if pdf_attrs[:id].present?
           pdf = @user.weekly_pdfs.find_by(id: pdf_attrs[:id])
           if pdf_attrs[:_destroy] == 'true'
-            pdf&.pdf&.purge # Remove only if marked for destruction
+            pdf&.pdf&.purge
           elsif pdf_attrs[:pdf].present?
-            pdf.pdf.attach(pdf_attrs[:pdf]) # Attach new file if provided
+            pdf.pdf.attach(pdf_attrs[:pdf])
           end
         end
       end
     end
-  
-    if @user.save
+
+    if attributes[:trainings_attributes].present?
+      attributes[:trainings_attributes].each do |_, training_attrs|
+        if training_attrs[:id].present?
+          training = @user.trainings.find_by(id: training_attrs[:id])
+          if training_attrs[:_destroy] == 'true'
+            training&.photos&.each(&:purge)
+          elsif training_attrs[:photos].present?
+            training_attrs[:photos].each do |photo|
+              training.photos.attach(photo) if training
+            end
+          end
+        end
+      end
+    end
+
+    if @user.update(attributes)
       render json: @user.as_json(
         only: [:id, :name, :email, :role, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
         include: {
@@ -122,6 +135,7 @@ class Api::V1::UsersController < ApplicationController
       render json: { error: 'Acesso não autorizado' }, status: :unauthorized
     end
   end
+
   private
 
   def set_user
@@ -132,11 +146,10 @@ class Api::V1::UsersController < ApplicationController
 
   def user_params
     params.require(:user).permit(
-      :name, :email, :password, :role, :registration_date, :plan_type, :plan_duration, :registration_date, :phone_number,
+      :name, :email, :password, :role, :registration_date, :plan_type, :plan_duration, :phone_number,
       trainings_attributes: [
         :id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday, :description, :_destroy,
-        photos: [],
-        training_photos_attributes: [:id, :image_url, :_destroy]
+        photos: []
       ],
       meals_attributes: [
         :id, :meal_type, :weekday, :_destroy,
@@ -149,7 +162,7 @@ class Api::V1::UsersController < ApplicationController
   end
 
   def notify_master_of_duplicate_login(user)
-    master = User.find_by(role: :master)
+    master = User.find_by generations: 2
     return unless master
 
     if master.device_token.present?
