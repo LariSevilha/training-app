@@ -10,8 +10,11 @@ class ApplicationController < ActionController::API
       if api_key
         @current_user = api_key.user
         @current_device_id = request.headers['Device-ID']
-        Rails.logger.info("Device-ID received: #{@current_device_id}, Expected: #{api_key.device_id}")
-        if @current_device_id && api_key.device_id != @current_device_id
+        unless @current_device_id
+          Rails.logger.warn("Device-ID header missing for token: #{token}")
+          render json: { error: 'Device-ID header is required' }, status: :unauthorized and return false
+        end
+        if api_key.device_id != @current_device_id
           Rails.logger.warn("Device ID mismatch for token: #{token}")
           render json: { error: 'Device ID mismatch' }, status: :unauthorized and return false
         end
