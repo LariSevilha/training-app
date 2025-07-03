@@ -46,20 +46,22 @@ class Api::V1::UsersController < ApplicationController
     end
   end
 
-  def update
-    # Remova destroy_all ou ajuste para preservar PDFs existentes se desejado
-    # Se quiser apenas um PDF, processe os atributos sem destruir tudo
+   def update
     attributes = user_params
     if attributes[:weekly_pdfs_attributes].present?
       @user.assign_attributes(attributes)
-      # Processar anexos antes de salvar
-      attributes[:weekly_pdfs_attributes].each do |pdf_attrs|
+      attributes[:weekly_pdfs_attributes].each do |_, pdf_attrs| # Use `_` for the index/key
         if pdf_attrs[:id].present?
-          pdf = @user.weekly_pdfs.find(pdf_attrs[:id])
-          pdf&.pdf&.purge if pdf_attrs[:_destroy] == 'true' # Remove apenas se marcado para destruir
+          pdf = @user.weekly_pdfs.find_by(id: pdf_attrs[:id])
+          if pdf_attrs[:_destroy] == 'true'
+            pdf&.pdf&.purge # Remove only if marked for destruction
+          elsif pdf_attrs[:pdf].present?
+            pdf.pdf.attach(pdf_attrs[:pdf]) # Attach new file if provided
+          end
         end
       end
     end
+  
     if @user.save
       render json: @user.as_json(
         only: [:id, :name, :email, :role, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
@@ -130,7 +132,7 @@ class Api::V1::UsersController < ApplicationController
 
   def user_params
     params.require(:user).permit(
-      :name, :email, :password, :role, :registration_date, :plan_type, :plan_duration, :phone_number,
+      :name, :email, :password, :role, :registration_date, :plan_type, :plan_duration, :registration_date, :phone_number,
       trainings_attributes: [
         :id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday, :description, :_destroy,
         photos: [],

@@ -11,10 +11,14 @@ Rails.application.routes.draw do
       delete 'sessions', to: 'sessions#destroy', as: :session_destroy
       post 'login', to: 'sessions#create', as: :login
       post 'send-whatsapp', to: 'whatsapp#send_message'
+      get 'current_user', to: 'users#current_user'
 
       resources :users do
         collection do
           post :unblock
+          patch :recalculate_expiration 
+          patch :renew_plan
+
         end
         member do
           post :unblock
