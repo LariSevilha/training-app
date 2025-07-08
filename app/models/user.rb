@@ -16,6 +16,9 @@ class User < ApplicationRecord
   validates :plan_type, inclusion: { in: %w[manual pdf], allow_nil: true }
   attribute :blocked, :boolean, default: false
 
+  # Add Active Storage association for photo
+  has_one_attached :photo
+
   def block_account!
     update!(blocked: true)
   end
@@ -31,6 +34,11 @@ class User < ApplicationRecord
 
   def formatted_expiration_date
     expiration_date&.strftime("%Y-%m-%d")
+  end
+
+  # Add photo_url method
+  def photo_url
+    photo.attached? ? Rails.application.routes.url_helpers.url_for(photo) : nil
   end
 
   private

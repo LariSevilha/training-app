@@ -18,6 +18,7 @@ class Api::V1::UsersController < ApplicationController
   def show
     render json: @user.as_json(
       only: [:id, :name, :email, :role, :registration_date, :plan_type, :plan_duration, :phone_number],
+      methods: [:photo_url], # Add photo_url
       include: {
         trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
         weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
@@ -33,6 +34,7 @@ class Api::V1::UsersController < ApplicationController
     if user.save 
       render json: user.as_json(
         only: [:id, :name, :email, :role, :registration_date, :plan_type, :plan_duration, :phone_number],
+        methods: [:photo_url], # Add photo_url
         include: {
           trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
           weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
@@ -75,9 +77,16 @@ class Api::V1::UsersController < ApplicationController
       end
     end
 
-    if @user.update(attributes)
+    # Handle photo update
+    if attributes[:photo].present?
+      @user.photo.purge if @user.photo.attached? # Remove existing photo if new one is provided
+      @user.photo.attach(attributes[:photo])
+    end
+
+    if @user.update(attributes.except(:photo)) # Update other attributes, excluding photo
       render json: @user.as_json(
         only: [:id, :name, :email, :role, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
+        methods: [:photo_url], # Add photo_url
         include: {
           trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
           weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
@@ -91,6 +100,7 @@ class Api::V1::UsersController < ApplicationController
   end
 
   def destroy
+    @user.photo.purge if @user.photo.attached? # Remove photo when user is deleted
     @user.destroy
     render json: { message: 'Usuário deletado com sucesso' }, status: :ok
   end
@@ -118,6 +128,7 @@ class Api::V1::UsersController < ApplicationController
         expiration_date: user.expiration_date,
         plan_type: user.plan_type,
         plan_duration: user.plan_duration,
+        photo_url: user.photo.attached? ? url_for(user.photo) : nil, # Add photo_url
         error: nil,
         trainings: user.trainings.as_json(
           only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday],
@@ -147,6 +158,7 @@ class Api::V1::UsersController < ApplicationController
   def user_params
     params.require(:user).permit(
       :name, :email, :password, :role, :registration_date, :plan_type, :plan_duration, :phone_number,
+      :photo, # Add photo parameter
       trainings_attributes: [
         :id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday, :description, :_destroy,
         photos: []

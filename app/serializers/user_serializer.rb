@@ -11,5 +11,6 @@ class UserSerializer < ActiveModel::Serializer
   def expiration_date
     object.formatted_expiration_date
   end
+ 
 end
 
