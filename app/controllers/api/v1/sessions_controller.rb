@@ -15,21 +15,22 @@ module Api
           render json: { error: 'Email, senha e device_id são obrigatórios' }, status: :bad_request and return
         end
       
-        user = User.find_by("LOWER(email) = ?", email.downcase)
+        user = User.find_by("LOWER(email) = ?", email.downcase) || MasterUser.find_by("LOWER(email) = ?", email.downcase)
         unless user
           render json: { error: 'Credenciais inválidas' }, status: :unauthorized and return
         end
-       
       
-        if user.authenticate(password) && !user.blocked
-          # Sempre gera/atualiza o ApiKey corretamente
-          api_key = user.api_keys.find_or_initialize_by(device_id: device_id)
+        if user.authenticate(password) && (!user.respond_to?(:blocked) || !user.blocked)
+          api_key = if user.is_a?(MasterUser)
+                      user.api_keys.find_or_initialize_by(device_id: device_id)
+                    else
+                      user.api_keys.find_or_initialize_by(device_id: device_id)
+                    end
           api_key.token = SecureRandom.uuid
           api_key.active = true
           api_key.save!
       
-          # Verifica múltiplos dispositivos para usuários não-master
-          unless user.master?
+          unless user.is_a?(MasterUser)
             active_devices = user.api_keys.active.where.not(id: api_key.id).pluck(:device_id)
             if active_devices.present? && active_devices.exclude?(device_id)
               notify_master_of_duplicate_login(user)
@@ -40,15 +41,14 @@ module Api
       
           render json: {
             api_key: api_key.token,
-            role: user.role,
+            user_type: user.is_a?(MasterUser) ? 'master' : 'regular',
             message: 'Login realizado com sucesso'
           }, status: :ok
         else
-          Rails.logger.info("Falha na autenticação ou conta bloqueada. Blocked: #{user.blocked}")
+          Rails.logger.info("Falha na autenticação ou conta bloqueada. Blocked: #{user.respond_to?(:blocked) ? user.blocked : 'N/A'}")
           render json: { error: 'Credenciais inválidas ou conta bloqueada' }, status: :unauthorized
         end
       end
-       
 
       def destroy
         api_key = request.headers['Authorization']&.split(' ')&.last
@@ -69,8 +69,13 @@ module Api
 
       private
 
+      # Override current_user for SessionsController since we skip authentication
+      def current_user
+        nil # Return nil since we don't have authenticated user context in login
+      end
+
       def notify_master_of_duplicate_login(user)
-        master = User.find_by(role: :master)
+        master = MasterUser.first # Ajustar conforme necessário
         return unless master && master.device_token.present?
 
         message = {
@@ -85,4 +90,3 @@ module Api
     end
   end
 end
-

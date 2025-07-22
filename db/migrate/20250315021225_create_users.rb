@@ -3,9 +3,7 @@ class CreateUsers < ActiveRecord::Migration[7.2]
     create_table :users do |t|
       t.string :name
       t.integer :permission_id  
-      t.string :avatar
-      t.integer :user_type  
-      t.integer :role
+      t.string :avatar 
       t.string :device_token
       t.string :phone_number, null: false, default: ""
       t.string :plan_duration

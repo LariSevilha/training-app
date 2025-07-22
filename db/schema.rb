@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_05_14_013839) do
+ActiveRecord::Schema[7.2].define(version: 2025_07_19_102815) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -49,12 +49,14 @@ ActiveRecord::Schema[7.2].define(version: 2025_05_14_013839) do
   end
 
   create_table "api_keys", force: :cascade do |t|
-    t.bigint "user_id", null: false
+    t.bigint "user_id"
     t.string "device_id", null: false
     t.string "token", null: false
     t.boolean "active", default: true
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "master_user_id"
+    t.index ["master_user_id"], name: "index_api_keys_on_master_user_id"
     t.index ["token"], name: "index_api_keys_on_token", unique: true
     t.index ["user_id", "device_id"], name: "index_api_keys_on_user_id_and_device_id", unique: true
     t.index ["user_id"], name: "index_api_keys_on_user_id"
@@ -68,6 +70,28 @@ ActiveRecord::Schema[7.2].define(version: 2025_05_14_013839) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["meal_id"], name: "index_comidas_on_meal_id"
+  end
+
+  create_table "dashboard_settings", force: :cascade do |t|
+    t.string "primary_color", null: false
+    t.string "secondary_color", null: false
+    t.string "tertiary_color", null: false
+    t.string "app_name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "master_users", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "email", null: false
+    t.string "phone_number", null: false
+    t.string "password_digest", null: false
+    t.string "cpf", null: false
+    t.string "cref", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cpf"], name: "index_master_users_on_cpf", unique: true
+    t.index ["email"], name: "index_master_users_on_email", unique: true
   end
 
   create_table "meals", force: :cascade do |t|
@@ -138,6 +162,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_05_14_013839) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "api_keys", "master_users"
   add_foreign_key "api_keys", "users"
   add_foreign_key "comidas", "meals"
   add_foreign_key "meals", "users"

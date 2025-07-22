@@ -1,33 +1,32 @@
 module Api
   module V1
     class DashboardController < ApplicationController
-      before_action :ensure_master, only: [:index]
-      respond_to :json
+      before_action :authenticate_with_api_key
+      before_action :ensure_master_user
 
       def index
-        Rails.logger.info("Carregando dashboard para usuário: #{current_user.id}, role: #{current_user.role}")
-        render json: current_user.as_json(
-          only: [:id, :name, :email, :role],
-          include: {
-            trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday] },
-            meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } },
-            weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] }
+        dashboard_data = {
+          user: current_user.as_json(only: [:id, :name, :email]),
+          metrics: {
+            total_users: User.count,
+            active_users: User.count,
+            total_master_users: MasterUser.count
           }
-        ), status: :ok
+        }
+
+        render json: dashboard_data, status: :ok
       rescue StandardError => e
-        Rails.logger.error("Erro ao carregar dashboard: #{e.message}\nBacktrace: #{e.backtrace.join("\n")}")
-        render json: { error: "Erro ao carregar o dashboard: #{e.message}" }, status: :internal_server_error
+        Rails.logger.error("Erro ao carregar dashboard: #{e.message}")
+        render json: { error: 'Erro ao carregar o dashboard' }, status: :internal_server_error
       end
 
       private
 
-      def ensure_master
-        unless current_user&.role == 'master'
-          Rails.logger.warn("Acesso não autorizado ao dashboard: usuário #{current_user&.id}")
-          render json: { error: 'Acesso não autorizado' }, status: :unauthorized
+      def ensure_master_user
+        unless current_user&.is_a?(MasterUser)
+          render json: { error: 'Acesso não autorizado. Apenas usuários master podem acessar o dashboard.' }, status: :unauthorized
         end
       end
     end
   end
 end
-

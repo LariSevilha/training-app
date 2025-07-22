@@ -8,15 +8,11 @@ class User < ApplicationRecord
   accepts_nested_attributes_for :trainings, allow_destroy: true
   accepts_nested_attributes_for :meals, allow_destroy: true
   before_save :set_dates
-  enum :role, { master: 0, regular: 1 }, default: :regular
   validates :email, presence: true, uniqueness: true
   validates :name, presence: true
-  # validates :phone_number, presence: true, format: { with: /\A\+?\d{10,15}\z/, message: "deve ser um número válido (ex.: +5511999999999)" }
   validates :plan_duration, inclusion: { in: %w[monthly semi_annual annual], allow_nil: true }
   validates :plan_type, inclusion: { in: %w[manual pdf], allow_nil: true }
   attribute :blocked, :boolean, default: false
-
-  # Add Active Storage association for photo
   has_one_attached :photo
 
   def block_account!
@@ -28,7 +24,6 @@ class User < ApplicationRecord
   end
 
   def expired?
-    return false if role == 'master'
     expiration_date.present? && expiration_date < Time.current
   end
 
@@ -36,7 +31,6 @@ class User < ApplicationRecord
     expiration_date&.strftime("%Y-%m-%d")
   end
 
-  # Add photo_url method
   def photo_url
     photo.attached? ? Rails.application.routes.url_helpers.url_for(photo) : nil
   end

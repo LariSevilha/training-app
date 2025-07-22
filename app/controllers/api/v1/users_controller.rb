@@ -4,9 +4,9 @@ class Api::V1::UsersController < ApplicationController
   respond_to :json
 
   def index
-    users = User.where(role: 'regular').includes(:trainings, :weekly_pdfs, meals: :comidas)
+    users = User.includes(:trainings, :weekly_pdfs, meals: :comidas)
     render json: users.as_json(
-      only: [:id, :name, :email, :role, :registration_date, :plan_type, :plan_duration],
+      only: [:id, :name, :email, :registration_date, :plan_type, :plan_duration],
       include: {
         trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
         weekly_pdfs: { only: [:id, :weekday, :pdf_url] },
@@ -17,8 +17,8 @@ class Api::V1::UsersController < ApplicationController
 
   def show
     render json: @user.as_json(
-      only: [:id, :name, :email, :role, :registration_date, :plan_type, :plan_duration, :phone_number],
-      methods: [:photo_url], # Add photo_url
+      only: [:id, :name, :email, :registration_date, :plan_type, :plan_duration, :phone_number],
+      methods: [:photo_url],
       include: {
         trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
         weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
@@ -27,14 +27,18 @@ class Api::V1::UsersController < ApplicationController
     ), status: :ok
   end
 
+  def current_user
+    super
+  end
+
+
   def create
     user = User.new(user_params)
-    user.role = :regular
     Rails.logger.info "Parâmetros recebidos: #{user_params.inspect}"
     if user.save 
       render json: user.as_json(
-        only: [:id, :name, :email, :role, :registration_date, :plan_type, :plan_duration, :phone_number],
-        methods: [:photo_url], # Add photo_url
+        only: [:id, :name, :email, :registration_date, :plan_type, :plan_duration, :phone_number],
+        methods: [:photo_url],
         include: {
           trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
           weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
@@ -77,16 +81,15 @@ class Api::V1::UsersController < ApplicationController
       end
     end
 
-    # Handle photo update
     if attributes[:photo].present?
-      @user.photo.purge if @user.photo.attached? # Remove existing photo if new one is provided
+      @user.photo.purge if @user.photo.attached?
       @user.photo.attach(attributes[:photo])
     end
 
-    if @user.update(attributes.except(:photo)) # Update other attributes, excluding photo
+    if @user.update(attributes.except(:photo))
       render json: @user.as_json(
-        only: [:id, :name, :email, :role, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
-        methods: [:photo_url], # Add photo_url
+        only: [:id, :name, :email, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
+        methods: [:photo_url],
         include: {
           trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
           weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
@@ -100,7 +103,7 @@ class Api::V1::UsersController < ApplicationController
   end
 
   def destroy
-    @user.photo.purge if @user.photo.attached? # Remove photo when user is deleted
+    @user.photo.purge if @user.photo.attached?
     @user.destroy
     render json: { message: 'Usuário deletado com sucesso' }, status: :ok
   end
@@ -112,7 +115,7 @@ class Api::V1::UsersController < ApplicationController
 
   def planilha
     user = User.find_by(api_key: params[:api_key])
-    if user && user.role == 'regular' && !user.blocked
+    if user && !user.blocked
       if user.expired?
         user.block_account!
         render json: { error: 'Conta expirada. Entre em contato com o administrador.' }, status: :unauthorized
@@ -123,12 +126,11 @@ class Api::V1::UsersController < ApplicationController
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
         registration_date: user.registration_date,
         expiration_date: user.expiration_date,
         plan_type: user.plan_type,
         plan_duration: user.plan_duration,
-        photo_url: user.photo.attached? ? url_for(user.photo) : nil, # Add photo_url
+        photo_url: user.photo.attached? ? url_for(user.photo) : nil,
         error: nil,
         trainings: user.trainings.as_json(
           only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday],
@@ -157,8 +159,8 @@ class Api::V1::UsersController < ApplicationController
 
   def user_params
     params.require(:user).permit(
-      :name, :email, :password, :role, :registration_date, :plan_type, :plan_duration, :phone_number,
-      :photo, # Add photo parameter
+      :name, :email, :password, :registration_date, :plan_type, :plan_duration, :phone_number,
+      :photo,
       trainings_attributes: [
         :id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday, :description, :_destroy,
         photos: []
@@ -174,7 +176,7 @@ class Api::V1::UsersController < ApplicationController
   end
 
   def notify_master_of_duplicate_login(user)
-    master = User.find_by generations: 2
+    master = MasterUser.first # Ajustar conforme necessário
     return unless master
 
     if master.device_token.present?
@@ -190,6 +192,9 @@ class Api::V1::UsersController < ApplicationController
   end
 
   def ensure_master
-    render json: { error: 'Acesso não autorizado' }, status: :unauthorized unless current_user&.role == 'master'
+    unless current_user&.is_a?(MasterUser)
+      render json: { error: 'Acesso não autorizado' }, status: :unauthorized
+      return
+    end
   end
 end

@@ -1,40 +1,35 @@
 class ApplicationController < ActionController::API
-  include ActionController::HttpAuthentication::Token::ControllerMethods
-
   before_action :authenticate_with_api_key
-
-  def authenticate_with_api_key
-    authenticate_or_request_with_http_token do |token, _options|
-      Rails.logger.info("Authenticating with token: #{token}")
-      api_key = ApiKey.active.find_by(token: token)
-      if api_key
-        @current_user = api_key.user
-        @current_device_id = request.headers['Device-ID']
-        unless @current_device_id
-          Rails.logger.warn("Device-ID header missing for token: #{token}")
-          render json: { error: 'Device-ID header is required' }, status: :unauthorized and return false
-        end
-        if api_key.device_id != @current_device_id
-          Rails.logger.warn("Device ID mismatch for token: #{token}")
-          render json: { error: 'Device ID mismatch' }, status: :unauthorized and return false
-        end
-        true
-      else
-        Rails.logger.warn("No active API key found for token: #{token}")
-        render json: { error: 'Unauthorized' }, status: :unauthorized and return false
-      end
-    end
-  end
-
-  def current_user
-    @current_user
-  end
 
   private
 
-  def ensure_master
-    unless current_user&.role == 'master'
-      render json: { error: 'Apenas o master pode realizar esta ação' }, status: :forbidden and return
+  def authenticate_with_api_key
+    auth_header = request.headers['Authorization']&.split(' ')&.last
+    device_id = request.headers['Device-ID']
+
+    Rails.logger.info("Autenticando com token: #{auth_header}, device_id: #{device_id}")
+
+    if auth_header && device_id
+      @api_key = ApiKey.find_by(token: auth_header, device_id: device_id, active: true)
+      unless @api_key
+        Rails.logger.error("Token inválido ou expirado: #{auth_header}")
+        render json: { error: 'Token inválido ou expirado' }, status: :unauthorized
+        return
+      end
+    else
+      Rails.logger.error("Cabeçalhos de autenticação ausentes: Authorization=#{auth_header}, Device-ID=#{device_id}")
+      render json: { error: 'Cabeçalhos de autenticação ausentes' }, status: :unauthorized
+      return
     end
+
+    Rails.logger.info("Autenticação bem-sucedida para api_key: #{@api_key.id}")
+  end
+
+  def current_user
+    @current_user ||= if @api_key.master_user_id
+                       MasterUser.find(@api_key.master_user_id)
+                     elsif @api_key.user_id
+                       User.find(@api_key.user_id)
+                     end
   end
 end
