@@ -8,8 +8,9 @@ module Api
       def index
         setting = DashboardSetting.first
         if setting
-          Rails.logger.info "Generated logo_url: #{setting.logo_url}"
-          render json: setting.as_json(only: [:id, :primary_color, :secondary_color, :tertiary_color, :app_name], methods: [:logo_url]), status: :ok
+          logo_url = generate_logo_url(setting)
+          Rails.logger.info "Generated logo_url: #{logo_url}"
+          render json: setting.as_json(only: [:id, :primary_color, :secondary_color, :tertiary_color, :app_name]).merge(logo_url: logo_url), status: :ok
         else
           render json: {
             id: nil,
@@ -23,18 +24,17 @@ module Api
       end
 
       def show
-        Rails.logger.info "Generated logo_url: #{@dashboard_setting.logo_url}"
-        render json: @dashboard_setting.as_json(only: [:id, :primary_color, :secondary_color, :tertiary_color, :app_name], methods: [:logo_url]), status: :ok
+        logo_url = generate_logo_url(@dashboard_setting)
+        Rails.logger.info "Generated logo_url: #{logo_url}"
+        render json: @dashboard_setting.as_json(only: [:id, :primary_color, :secondary_color, :tertiary_color, :app_name]).merge(logo_url: logo_url), status: :ok
       end
 
       def create
         dashboard_setting = DashboardSetting.new(dashboard_setting_params)
         if dashboard_setting.save
-          if params[:dashboard_setting][:logo].present?
-            dashboard_setting.logo.attach(params[:dashboard_setting][:logo])
-          end
-          Rails.logger.info "Created dashboard setting, logo_url: #{dashboard_setting.logo_url}"
-          render json: dashboard_setting.as_json(only: [:id, :primary_color, :secondary_color, :tertiary_color, :app_name], methods: [:logo_url]), status: :created
+          logo_url = generate_logo_url(dashboard_setting)
+          Rails.logger.info "Created dashboard setting, logo_url: #{logo_url}"
+          render json: dashboard_setting.as_json(only: [:id, :primary_color, :secondary_color, :tertiary_color, :app_name]).merge(logo_url: logo_url), status: :created
         else
           Rails.logger.error "Failed to create dashboard setting: #{dashboard_setting.errors.full_messages}"
           render json: { errors: dashboard_setting.errors.full_messages }, status: :unprocessable_entity
@@ -44,13 +44,16 @@ module Api
       def update
         Rails.logger.info "Updating dashboard setting with ID: #{params[:id]}"
         Rails.logger.info "Params: #{dashboard_setting_params}"
-        if params[:dashboard_setting][:logo].present?
-          @dashboard_setting.logo.purge if @dashboard_setting.logo.attached?
-          @dashboard_setting.logo.attach(params[:dashboard_setting][:logo])
+        
+        # Remove logo antiga se uma nova for enviada
+        if params[:dashboard_setting][:logo].present? && @dashboard_setting.logo.attached?
+          @dashboard_setting.logo.purge
         end
+        
         if @dashboard_setting.update(dashboard_setting_params)
-          Rails.logger.info "Successfully updated dashboard setting, logo_url: #{@dashboard_setting.logo_url}"
-          render json: @dashboard_setting.as_json(only: [:id, :primary_color, :secondary_color, :tertiary_color, :app_name], methods: [:logo_url]), status: :ok
+          logo_url = generate_logo_url(@dashboard_setting)
+          Rails.logger.info "Successfully updated dashboard setting, logo_url: #{logo_url}"
+          render json: @dashboard_setting.as_json(only: [:id, :primary_color, :secondary_color, :tertiary_color, :app_name]).merge(logo_url: logo_url), status: :ok
         else
           Rails.logger.error "Failed to update dashboard setting: #{@dashboard_setting.errors.full_messages}"
           render json: { errors: @dashboard_setting.errors.full_messages }, status: :unprocessable_entity
@@ -71,6 +74,24 @@ module Api
 
       def ensure_master
         render json: { error: 'Acesso não autorizado' }, status: :unauthorized unless current_user.is_a?(MasterUser)
+      end
+
+      def generate_logo_url(setting)
+        return nil unless setting&.logo&.attached?
+        
+        begin
+          # Try to generate URL with explicit host
+          if Rails.env.development?
+            Rails.application.routes.url_helpers.rails_blob_url(setting.logo, host: 'localhost:3000', protocol: 'http')
+          else
+            # For production, you should set this in your environment config
+            Rails.application.routes.url_helpers.rails_blob_url(setting.logo, host: Rails.application.config.action_mailer.default_url_options[:host] || request.host, protocol: request.protocol.chomp('://'))
+          end
+        rescue => e
+          Rails.logger.error "Error generating logo URL: #{e.message}"
+          # Fallback to path-only URL
+          Rails.application.routes.url_helpers.rails_blob_path(setting.logo)
+        end
       end
     end
   end
