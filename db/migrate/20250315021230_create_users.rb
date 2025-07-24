@@ -10,6 +10,7 @@ class CreateUsers < ActiveRecord::Migration[7.2]
       t.string :plan_type 
       t.datetime :registration_date
       t.datetime :expiration_date
+      t.references :master_user, null: true, foreign_key: true  # Changed to null: true
 
       t.timestamps
     end

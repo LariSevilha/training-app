@@ -17,7 +17,7 @@ class ApplicationController < ActionController::API
         return
       end
     else
-      Rails.logger.error("Cabeçalhos de autenticação ausentes: Authorization=#{auth_header}, Device-ID=#{device_id}")
+      Rails.logger.error("Cabeçalhos de autenticação ausentes")
       render json: { error: 'Cabeçalhos de autenticação ausentes' }, status: :unauthorized
       return
     end
@@ -26,10 +26,7 @@ class ApplicationController < ActionController::API
   end
 
   def current_user
-    @current_user ||= if @api_key.master_user_id
-                       MasterUser.find(@api_key.master_user_id)
-                     elsif @api_key.user_id
-                       User.find(@api_key.user_id)
-                     end
+    return nil unless @api_key
+    @current_user ||= @api_key.associated_user
   end
 end

@@ -1,13 +1,59 @@
 module Api
   module V1
     class MasterUsersController < ApplicationController
-      before_action :ensure_master, only: [:show, :update]
-      before_action :set_master_user, only: [:show, :update]
+      before_action :ensure_super_user, only: [:create, :index, :destroy]
+      before_action :ensure_master_or_super, only: [:show, :update]
+      before_action :set_master_user, only: [:show, :update, :destroy]
+
+      def index
+        begin
+          master_users = MasterUser.all.includes(:api_keys, :users)
+          
+          masters_data = master_users.map do |master|
+            {
+              id: master.id,
+              name: master.name,
+              email: master.email,
+              phone_number: master.phone_number,
+              cpf: master.cpf,
+              cref: master.cref,
+              created_at: master.created_at,
+              updated_at: master.updated_at,
+              users_count: master.users.count,
+              active_sessions: master.api_keys.active.count,
+              photo_url: master.photo_url
+            }
+          end
+          
+          render json: masters_data, status: :ok
+        rescue StandardError => e
+          Rails.logger.error "Error fetching master users: #{e.message}"
+          render json: { error: "Erro ao buscar usuários master: #{e.message}" }, status: :internal_server_error
+        end
+      end
+
+      def create
+        master_user = MasterUser.new(master_user_params)
+        if master_user.save
+          render json: {
+            id: master_user.id,
+            name: master_user.name,
+            email: master_user.email,
+            phone_number: master_user.phone_number,
+            cpf: master_user.cpf,
+            cref: master_user.cref,
+            photo_url: master_user.photo_url,
+            message: 'Master user criado com sucesso'
+          }, status: :created
+        else
+          render json: { errors: master_user.errors.full_messages }, status: :unprocessable_entity
+        end
+      end
 
       def show
         Rails.logger.info "Generated photo_url: #{@master_user.photo_url}"
         render json: @master_user.as_json(
-          only: [:id, :name, :email, :phone_number, :cpf, :cref],
+          only: [:id, :name, :email, :phone_number, :cpf, :cref, :created_at, :updated_at],
           methods: [:photo_url]
         ), status: :ok
       rescue StandardError => e
@@ -32,7 +78,7 @@ module Api
             if @master_user.update(master_user_params.except(:photo))
               Rails.logger.info "Master user updated successfully, photo_url: #{@master_user.photo_url}"
               render json: @master_user.as_json(
-                only: [:id, :name, :email, :phone_number, :cpf, :cref],
+                only: [:id, :name, :email, :phone_number, :cpf, :cref, :created_at, :updated_at],
                 methods: [:photo_url]
               ), status: :ok
             else
@@ -46,11 +92,33 @@ module Api
         end
       end
 
+      def destroy
+        begin
+          if @master_user.users.any?
+            render json: { error: 'Não é possível excluir um master user que possui usuários cadastrados' }, status: :unprocessable_entity
+            return
+          end
+
+          @master_user.destroy!
+          render json: { message: 'Master user excluído com sucesso' }, status: :ok
+        rescue StandardError => e
+          Rails.logger.error "Error deleting master user: #{e.message}"
+          render json: { error: "Erro ao excluir usuário master: #{e.message}" }, status: :internal_server_error
+        end
+      end
+
       private
 
       def set_master_user
-        @master_user = current_user if current_user.is_a?(MasterUser)
-        @master_user ||= MasterUser.find_by(id: params[:id]) if params[:id].present?
+        if current_user.is_a?(SuperUser)
+          # SuperUser pode acessar qualquer master user
+          @master_user = MasterUser.find_by(id: params[:id]) if params[:id].present?
+          @master_user ||= MasterUser.find(params[:id]) if params[:id].present?
+        else
+          # MasterUser só pode acessar seus próprios dados
+          @master_user = current_user if current_user.is_a?(MasterUser)
+        end
+        
         unless @master_user
           Rails.logger.error "Master user not found for current_user: #{current_user&.id}, params[:id]: #{params[:id]}"
           render json: { error: 'Usuário master não encontrado' }, status: :not_found and return
@@ -58,13 +126,20 @@ module Api
       end
 
       def master_user_params
-        params.require(:master_user).permit(:name, :email, :phone_number, :cpf, :cref, :photo, :password)
+        params.require(:master_user).permit(:name, :email, :phone_number, :cpf, :cref, :photo, :password, :password_confirmation)
       end
 
-      def ensure_master
-        unless current_user.is_a?(MasterUser)
+      def ensure_master_or_super
+        unless current_user.is_a?(MasterUser) || current_user.is_a?(SuperUser)
           Rails.logger.warn "Unauthorized access attempt by user: #{current_user&.id}"
           render json: { error: 'Acesso não autorizado' }, status: :unauthorized and return
+        end
+      end
+
+      def ensure_super_user
+        unless current_user&.is_a?(SuperUser)
+          Rails.logger.warn "Unauthorized access attempt by non-superuser: #{current_user&.id}"
+          render json: { error: 'Acesso não autorizado. Apenas superusuários podem realizar esta ação.' }, status: :unauthorized
         end
       end
     end

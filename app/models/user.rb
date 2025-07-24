@@ -13,8 +13,8 @@ class User < ApplicationRecord
   validates :plan_duration, inclusion: { in: %w[monthly semi_annual annual], allow_nil: true }
   validates :plan_type, inclusion: { in: %w[manual pdf], allow_nil: true }
   attribute :blocked, :boolean, default: false
-  has_one_attached :photo
-
+  has_one_attached :photo 
+  belongs_to :master_user, optional: true 
   def block_account!
     update!(blocked: true)
   end

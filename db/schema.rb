@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_07_19_102815) do
+ActiveRecord::Schema[7.2].define(version: 2025_07_23_020019) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -56,7 +56,9 @@ ActiveRecord::Schema[7.2].define(version: 2025_07_19_102815) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "master_user_id"
+    t.bigint "super_user_id"
     t.index ["master_user_id"], name: "index_api_keys_on_master_user_id"
+    t.index ["super_user_id"], name: "index_api_keys_on_super_user_id"
     t.index ["token"], name: "index_api_keys_on_token", unique: true
     t.index ["user_id", "device_id"], name: "index_api_keys_on_user_id_and_device_id", unique: true
     t.index ["user_id"], name: "index_api_keys_on_user_id"
@@ -103,6 +105,15 @@ ActiveRecord::Schema[7.2].define(version: 2025_07_19_102815) do
     t.index ["user_id"], name: "index_meals_on_user_id"
   end
 
+  create_table "super_users", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "email", null: false
+    t.string "password_digest", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_super_users_on_email", unique: true
+  end
+
   create_table "training_photos", force: :cascade do |t|
     t.bigint "training_id", null: false
     t.string "image_url"
@@ -129,14 +140,13 @@ ActiveRecord::Schema[7.2].define(version: 2025_07_19_102815) do
     t.string "name"
     t.integer "permission_id"
     t.string "avatar"
-    t.integer "user_type"
-    t.integer "role"
     t.string "device_token"
     t.string "phone_number", default: "", null: false
     t.string "plan_duration"
     t.string "plan_type"
     t.datetime "registration_date"
     t.datetime "expiration_date"
+    t.bigint "master_user_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "email", default: "", null: false
@@ -149,6 +159,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_07_19_102815) do
     t.string "password_digest"
     t.index ["api_key"], name: "index_users_on_api_key", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["master_user_id"], name: "index_users_on_master_user_id"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
@@ -163,10 +174,12 @@ ActiveRecord::Schema[7.2].define(version: 2025_07_19_102815) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "api_keys", "master_users"
+  add_foreign_key "api_keys", "super_users"
   add_foreign_key "api_keys", "users"
   add_foreign_key "comidas", "meals"
   add_foreign_key "meals", "users"
   add_foreign_key "training_photos", "trainings"
   add_foreign_key "trainings", "users"
+  add_foreign_key "users", "master_users"
   add_foreign_key "weekly_pdfs", "users"
 end

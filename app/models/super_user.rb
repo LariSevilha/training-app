@@ -1,14 +1,10 @@
-class MasterUser < ApplicationRecord
+class SuperUser < ApplicationRecord
     has_secure_password
     has_many :api_keys, dependent: :destroy
-    has_many :users, dependent: :destroy
     has_one_attached :photo
   
     validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
     validates :name, presence: true
-    validates :cpf, presence: true, uniqueness: true
-    validates :cref, presence: true
-    validates :phone_number, presence: true
   
     def photo_url
       return nil unless photo.attached?
@@ -18,4 +14,3 @@ class MasterUser < ApplicationRecord
       nil
     end
   end
-  

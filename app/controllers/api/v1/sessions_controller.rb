@@ -15,37 +15,54 @@ module Api
           render json: { error: 'Email, senha e device_id são obrigatórios' }, status: :bad_request and return
         end
       
-        user = User.find_by("LOWER(email) = ?", email.downcase) || MasterUser.find_by("LOWER(email) = ?", email.downcase)
+        # Buscar em todos os tipos de usuário
+        user = User.find_by("LOWER(email) = ?", email.downcase) ||
+               MasterUser.find_by("LOWER(email) = ?", email.downcase) ||
+               SuperUser.find_by("LOWER(email) = ?", email.downcase)
+               
         unless user
           render json: { error: 'Credenciais inválidas' }, status: :unauthorized and return
         end
       
         if user.authenticate(password) && (!user.respond_to?(:blocked) || !user.blocked)
-          api_key = if user.is_a?(MasterUser)
-                      user.api_keys.find_or_initialize_by(device_id: device_id)
-                    else
-                      user.api_keys.find_or_initialize_by(device_id: device_id)
-                    end
-          api_key.token = SecureRandom.uuid
+          # Criar ou atualizar API key baseado no tipo de usuário
+          api_key = case user.class.name
+                   when 'SuperUser'
+                     user.api_keys.find_or_initialize_by(device_id: device_id)
+                   when 'MasterUser'
+                     user.api_keys.find_or_initialize_by(device_id: device_id)
+                   when 'User'
+                     user.api_keys.find_or_initialize_by(device_id: device_id)
+                   end
+                   
+          api_key.token = SecureRandom.hex(16)
           api_key.active = true
           api_key.save!
       
-          unless user.is_a?(MasterUser)
+          # Verificação de múltiplos dispositivos apenas para User comum
+          if user.is_a?(User)
             active_devices = user.api_keys.active.where.not(id: api_key.id).pluck(:device_id)
             if active_devices.present? && active_devices.exclude?(device_id)
               notify_master_of_duplicate_login(user)
-              user.block_account!
+              user.block_account! if user.respond_to?(:block_account!)
               render json: { error: 'Conta bloqueada devido a acesso simultâneo' }, status: :unauthorized and return
             end
           end
       
+          user_type = case user.class.name
+                     when 'SuperUser' then 'super'
+                     when 'MasterUser' then 'master'
+                     when 'User' then 'regular'
+                     end
+      
           render json: {
             api_key: api_key.token,
-            user_type: user.is_a?(MasterUser) ? 'master' : 'regular',
+            user_type: user_type,
+            user_id: user.id,
             message: 'Login realizado com sucesso'
           }, status: :ok
         else
-          Rails.logger.info("Falha na autenticação ou conta bloqueada. Blocked: #{user.respond_to?(:blocked) ? user.blocked : 'N/A'}")
+          Rails.logger.info("Falha na autenticação ou conta bloqueada")
           render json: { error: 'Credenciais inválidas ou conta bloqueada' }, status: :unauthorized
         end
       end
@@ -69,7 +86,6 @@ module Api
 
       private
 
-      # Override current_user for SessionsController since we skip authentication
       def current_user
         nil # Return nil since we don't have authenticated user context in login
       end
@@ -85,7 +101,7 @@ module Api
             body: "O usuário #{user.email} tentou fazer login em um novo dispositivo."
           }
         }
-        # Implementar envio de notificação, ex.: fcm.send([master.device_token], message)
+        # Implementar envio de notificação
       end
     end
   end
