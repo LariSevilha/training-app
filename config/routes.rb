@@ -1,5 +1,4 @@
-
-# ROTAS ATUALIZADAS (config/routes.rb)
+# config/routes.rb
 Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
 
@@ -10,7 +9,9 @@ Rails.application.routes.draw do
       
       # Master Users
       resources :master_users, only: [:index, :create, :show, :update, :destroy]
-      get '/master_user', to: 'master_users#show'
+      
+      # ROTA ESPECÍFICA para buscar dados do master user atual
+      get '/master_user', to: 'master_users#current_master'
       put '/master_user/:id', to: 'master_users#update'
       
       # Sessions
@@ -28,10 +29,13 @@ Rails.application.routes.draw do
       # WhatsApp
       post 'send-whatsapp', to: 'whatsapp#send_message'
       
+      # Current User - ADD THIS LINE
+      get 'current_user', to: 'users#current_user', as: :current_user
+      
       # Users
       resources :users do
         collection do
-          get :current_user
+          # Remove current_user from here since it's now a standalone route
           post :unblock
           patch :recalculate_expiration
           patch :renew_plan
@@ -40,8 +44,6 @@ Rails.application.routes.draw do
           post :unblock
         end
       end
-      
-      get 'current_user', to: 'users#current_user'
       
       # Other resources
       resources :planilhas, only: [:show]

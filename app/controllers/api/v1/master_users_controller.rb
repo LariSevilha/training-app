@@ -2,7 +2,7 @@ module Api
   module V1
     class MasterUsersController < ApplicationController
       before_action :ensure_super_user, only: [:create, :index, :destroy]
-      before_action :ensure_master_or_super, only: [:show, :update]
+      before_action :ensure_master_or_super, only: [:show, :update, :current_master]
       before_action :set_master_user, only: [:show, :update, :destroy]
 
       def index
@@ -21,7 +21,8 @@ module Api
               updated_at: master.updated_at,
               users_count: master.users.count,
               active_sessions: master.api_keys.active.count,
-              photo_url: master.photo_url
+              photo_url: master.photo_url,
+              role: 'master'
             }
           end
           
@@ -29,6 +30,31 @@ module Api
         rescue StandardError => e
           Rails.logger.error "Error fetching master users: #{e.message}"
           render json: { error: "Erro ao buscar usuários master: #{e.message}" }, status: :internal_server_error
+        end
+      end
+
+      # Nova action para buscar o master user atual
+      def current_master
+        begin
+          if current_user.is_a?(MasterUser)
+            render json: current_user.as_json(
+              only: [:id, :name, :email, :phone_number, :cpf, :cref, :created_at, :updated_at],
+              methods: [:photo_url]
+            ).merge(role: 'master'), status: :ok
+          elsif current_user.is_a?(SuperUser)
+            # SuperUser pode acessar dados básicos
+            render json: {
+              id: current_user.id,
+              name: current_user.name,
+              email: current_user.email,
+              role: 'super'
+            }, status: :ok
+          else
+            render json: { error: 'Usuário não autorizado' }, status: :unauthorized
+          end
+        rescue StandardError => e
+          Rails.logger.error "Error fetching current master: #{e.message}"
+          render json: { error: "Erro ao buscar dados do usuário: #{e.message}" }, status: :internal_server_error
         end
       end
 
@@ -43,6 +69,7 @@ module Api
             cpf: master_user.cpf,
             cref: master_user.cref,
             photo_url: master_user.photo_url,
+            role: 'master',
             message: 'Master user criado com sucesso'
           }, status: :created
         else
@@ -51,14 +78,16 @@ module Api
       end
 
       def show
-        Rails.logger.info "Generated photo_url: #{@master_user.photo_url}"
-        render json: @master_user.as_json(
-          only: [:id, :name, :email, :phone_number, :cpf, :cref, :created_at, :updated_at],
-          methods: [:photo_url]
-        ), status: :ok
-      rescue StandardError => e
-        Rails.logger.error "Error in show action: #{e.message}"
-        render json: { error: "Erro ao buscar usuário master: #{e.message}" }, status: :internal_server_error
+        begin
+          Rails.logger.info "Generated photo_url: #{@master_user.photo_url}"
+          render json: @master_user.as_json(
+            only: [:id, :name, :email, :phone_number, :cpf, :cref, :created_at, :updated_at],
+            methods: [:photo_url]
+          ).merge(role: 'master'), status: :ok
+        rescue StandardError => e
+          Rails.logger.error "Error in show action: #{e.message}"
+          render json: { error: "Erro ao buscar usuário master: #{e.message}" }, status: :internal_server_error
+        end
       end
 
       def update
@@ -80,7 +109,7 @@ module Api
               render json: @master_user.as_json(
                 only: [:id, :name, :email, :phone_number, :cpf, :cref, :created_at, :updated_at],
                 methods: [:photo_url]
-              ), status: :ok
+              ).merge(role: 'master'), status: :ok
             else
               Rails.logger.error "Failed to update master user: #{@master_user.errors.full_messages}"
               render json: { errors: @master_user.errors.full_messages }, status: :unprocessable_entity
@@ -128,7 +157,7 @@ module Api
       def master_user_params
         params.require(:master_user).permit(:name, :email, :phone_number, :cpf, :cref, :photo, :password, :password_confirmation)
       end
-
+      
       def ensure_master_or_super
         unless current_user.is_a?(MasterUser) || current_user.is_a?(SuperUser)
           Rails.logger.warn "Unauthorized access attempt by user: #{current_user&.id}"

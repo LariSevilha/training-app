@@ -29,4 +29,11 @@ class ApplicationController < ActionController::API
     return nil unless @api_key
     @current_user ||= @api_key.associated_user
   end
+
+  def user_role
+    return 'super' if current_user.is_a?(SuperUser)
+    return 'master' if current_user.is_a?(MasterUser)
+    return 'user' if current_user.is_a?(User)
+    nil
+  end
 end

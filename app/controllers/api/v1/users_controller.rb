@@ -1,7 +1,7 @@
 class Api::V1::UsersController < ApplicationController
-  before_action :ensure_master, only: [:index, :show, :create, :update, :destroy, :unblock]
-  before_action :set_user, only: [:show, :update, :destroy, :unblock]
-  respond_to :json
+  before_action :ensure_master_user, only: [:create]
+  before_action :set_user, only: [:show, :update, :destroy]
+  # respond_to :json
 
   def index
     users = User.includes(:trainings, :weekly_pdfs, meals: :comidas)
@@ -33,7 +33,7 @@ class Api::V1::UsersController < ApplicationController
 
 
   def create
-    user = User.new(user_params)
+    user = User.new(user_params.merge(master_user_id: current_user.id))
     Rails.logger.info "Parâmetros recebidos: #{user_params.inspect}"
     if user.save 
       render json: user.as_json(
