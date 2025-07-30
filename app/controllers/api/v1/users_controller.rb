@@ -1,7 +1,6 @@
 class Api::V1::UsersController < ApplicationController
-  before_action :ensure_master_user, only: [:create]
+  before_action :ensure_master_user_access, only: [:create]
   before_action :set_user, only: [:show, :update, :destroy]
-  # respond_to :json
 
   def index
     users = User.includes(:trainings, :weekly_pdfs, meals: :comidas)
@@ -31,10 +30,16 @@ class Api::V1::UsersController < ApplicationController
     super
   end
 
-
   def create
+    # Ensure we have a master user creating this user
+    unless current_user&.is_a?(MasterUser)
+      render json: { error: 'Acesso não autorizado' }, status: :unauthorized
+      return
+    end
+
     user = User.new(user_params.merge(master_user_id: current_user.id))
     Rails.logger.info "Parâmetros recebidos: #{user_params.inspect}"
+    
     if user.save 
       render json: user.as_json(
         only: [:id, :name, :email, :registration_date, :plan_type, :plan_duration, :phone_number],
@@ -53,6 +58,8 @@ class Api::V1::UsersController < ApplicationController
 
   def update
     attributes = user_params
+    
+    # Handle weekly PDFs
     if attributes[:weekly_pdfs_attributes].present?
       attributes[:weekly_pdfs_attributes].each do |_, pdf_attrs|
         if pdf_attrs[:id].present?
@@ -60,12 +67,13 @@ class Api::V1::UsersController < ApplicationController
           if pdf_attrs[:_destroy] == 'true'
             pdf&.pdf&.purge
           elsif pdf_attrs[:pdf].present?
-            pdf.pdf.attach(pdf_attrs[:pdf])
+            pdf&.pdf&.attach(pdf_attrs[:pdf])
           end
         end
       end
     end
 
+    # Handle training photos
     if attributes[:trainings_attributes].present?
       attributes[:trainings_attributes].each do |_, training_attrs|
         if training_attrs[:id].present?
@@ -74,13 +82,14 @@ class Api::V1::UsersController < ApplicationController
             training&.photos&.each(&:purge)
           elsif training_attrs[:photos].present?
             training_attrs[:photos].each do |photo|
-              training.photos.attach(photo) if training
+              training&.photos&.attach(photo)
             end
           end
         end
       end
     end
 
+    # Handle user photo
     if attributes[:photo].present?
       @user.photo.purge if @user.photo.attached?
       @user.photo.attach(attributes[:photo])
@@ -157,6 +166,14 @@ class Api::V1::UsersController < ApplicationController
     render json: { error: 'Usuário não encontrado' }, status: :not_found and return
   end
 
+  def ensure_master_user_access
+    unless current_user&.is_a?(MasterUser)
+      render json: { error: 'Acesso não autorizado' }, status: :unauthorized
+      return false
+    end
+    true
+  end
+
   def user_params
     params.require(:user).permit(
       :name, :email, :password, :registration_date, :plan_type, :plan_duration, :phone_number,
@@ -188,13 +205,6 @@ class Api::V1::UsersController < ApplicationController
         }
       }
       # Implementar envio de notificação, ex.: fcm.send([master.device_token], message)
-    end
-  end
-
-  def ensure_master
-    unless current_user&.is_a?(MasterUser)
-      render json: { error: 'Acesso não autorizado' }, status: :unauthorized
-      return
     end
   end
 end
