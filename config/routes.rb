@@ -4,6 +4,8 @@ Rails.application.routes.draw do
 
   namespace :api do
     namespace :v1 do
+      
+      get 'dashboard/current_user_profile', to: 'dashboard#current_user_profile'
       # Super Users
       post 'super_users', to: 'super_users#create'
       

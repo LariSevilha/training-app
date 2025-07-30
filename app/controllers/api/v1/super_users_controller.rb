@@ -28,6 +28,7 @@ module Api
           Rails.logger.error "Error creating super user: #{e.message}"
           render json: { errors: ["Erro ao criar superusuário: #{e.message}"] }, status: :unprocessable_entity
         end
+      end
 
       private
 
@@ -39,8 +40,15 @@ module Api
         end
       end
 
+      def ensure_super_user
+        unless current_user&.is_a?(SuperUser)
+          Rails.logger.warn "Unauthorized access attempt by non-superuser: #{current_user&.id}"
+          render json: { error: 'Acesso não autorizado.' }, status: :unauthorized
+        end
+      end
+
       def super_user_params
-        params.require(:super_user).permit(:name, :email, :password, :password_confirmation)
+        params.require(:super_user).permit(:name, :email, :password, :password_confirmation, :phone_number, :photo)
       end
     end
   end
