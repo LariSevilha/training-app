@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_07_23_020019) do
+ActiveRecord::Schema[7.2].define(version: 2025_08_01_015537) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -81,6 +81,8 @@ ActiveRecord::Schema[7.2].define(version: 2025_07_23_020019) do
     t.string "app_name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "master_user_id", null: false
+    t.index ["master_user_id"], name: "index_dashboard_settings_on_master_user_id"
   end
 
   create_table "master_users", force: :cascade do |t|
@@ -177,6 +179,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_07_23_020019) do
   add_foreign_key "api_keys", "super_users"
   add_foreign_key "api_keys", "users"
   add_foreign_key "comidas", "meals"
+  add_foreign_key "dashboard_settings", "master_users"
   add_foreign_key "meals", "users"
   add_foreign_key "training_photos", "trainings"
   add_foreign_key "trainings", "users"

@@ -7,11 +7,13 @@ module Api
       def index
         begin
           user_data = build_user_data
-          metrics_data = build_metrics_data
+          metrics_data = build_metrics_data 
+          dashboard_settings = get_user_dashboard_settings
           
           render json: {
             user: user_data,
             metrics: metrics_data,
+            dashboard_settings: dashboard_settings,
             message: 'Dashboard carregado com sucesso'
           }, status: :ok
         rescue StandardError => e
@@ -58,32 +60,23 @@ module Api
               return
             end
 
-            Rails.logger.info "Updating profile for user ID: #{user.id}, type: #{user.class}"
+            Rails.logger.info "Updating profile for user ID: #{user.id}, type: #{user.class}, params: #{user_params.inspect}"
 
-            # Handle photo upload if present
-            if user_params[:photo].present? && user_params[:photo].respond_to?(:content_type)
-              Rails.logger.info "Updating photo for user ID: #{user.id}"
-              user.photo.purge_later if user.photo.attached?
-              user.photo.attach(user_params[:photo])
-              unless user.photo.attached?
-                raise ActiveRecord::RecordInvalid.new(user), "Falha ao anexar a nova foto"
-              end
-            end
-
-            # Update user data
-            update_params = user_params.except(:photo)
-            Rails.logger.info "Update params: #{update_params.inspect}"
-            
-            if user.update(update_params)
-              Rails.logger.info "User updated successfully"
-              updated_user_data = build_detailed_user_data_for_profile
-              
+            if user.update(user_params)
               render json: {
-                user: updated_user_data,
-                message: 'Perfil atualizado com sucesso'
+                message: 'Perfil atualizado com sucesso',
+                user: {
+                  id: user.id,
+                  name: user.name,
+                  email: user.email,
+                  phone_number: user.phone_number,
+                  photo_url: user.photo_url,
+                  role: user_role,
+                  cpf: user.respond_to?(:cpf) ? user.cpf : nil,
+                  cref: user.respond_to?(:cref) ? user.cref : nil
+                }
               }, status: :ok
             else
-              Rails.logger.error "Failed to update user: #{user.errors.full_messages}"
               render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
             end
           end
@@ -92,58 +85,32 @@ module Api
           render json: { errors: ["Erro ao atualizar perfil: #{e.message}"] }, status: :unprocessable_entity
         end
       end
-
+ 
       def change_password
-        begin
-          user = current_user
-          unless user
-            render json: { errors: ['Usuário não autenticado'] }, status: :unauthorized
-            return
-          end
-
-          current_password = params[:current_password]
-          new_password = params[:new_password]
-          new_password_confirmation = params[:new_password_confirmation]
-
-          # Validate required parameters
-          if current_password.blank?
-            render json: { errors: ['Senha atual é obrigatória'] }, status: :unprocessable_entity
-            return
-          end
-
-          if new_password.blank?
-            render json: { errors: ['Nova senha é obrigatória'] }, status: :unprocessable_entity
-            return
-          end
-
-          # Validate current password
-          unless user.authenticate(current_password)
-            render json: { errors: ['Senha atual incorreta'] }, status: :unprocessable_entity
-            return
-          end
-
-          # Validate new password
-          if new_password != new_password_confirmation
-            render json: { errors: ['Nova senha e confirmação não coincidem'] }, status: :unprocessable_entity
-            return
-          end
-
-          if new_password.length < 6
-            render json: { errors: ['Nova senha deve ter pelo menos 6 caracteres'] }, status: :unprocessable_entity
-            return
-          end
-
-          # Update password
-          if user.update(password: new_password, password_confirmation: new_password_confirmation)
-            Rails.logger.info "Password changed successfully for user ID: #{user.id}"
-            render json: { message: 'Senha alterada com sucesso' }, status: :ok
-          else
-            render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
-          end
-        rescue => e
-          Rails.logger.error "Error changing password: #{e.message}"
-          render json: { errors: ["Erro ao alterar senha: #{e.message}"] }, status: :internal_server_error
+        user = current_user
+        unless user
+          render json: { error: 'Usuário não autenticado' }, status: :unauthorized
+          return
         end
+
+        unless params[:password].present? && params[:password_confirmation].present?
+          render json: { errors: ['Senha e confirmação de senha são obrigatórias'] }, status: :unprocessable_entity
+          return
+        end
+
+        if params[:password] != params[:password_confirmation]
+          render json: { errors: ['As senhas não coincidem'] }, status: :unprocessable_entity
+          return
+        end
+
+        if user.update(password: params[:password], password_confirmation: params[:password_confirmation])
+          render json: { message: 'Senha atualizada com sucesso' }, status: :ok
+        else
+          render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
+        end
+      rescue StandardError => e
+        Rails.logger.error "Error changing password: #{e.message}"
+        render json: { errors: ["Erro ao atualizar senha: #{e.message}"] }, status: :unprocessable_entity
       end
 
       private
@@ -291,8 +258,21 @@ module Api
           'user'
         end
       end
+      
+      def get_user_dashboard_settings
+        setting = DashboardSetting.for_user(current_user)
+        return nil unless setting
+        
+        {
+          id: setting.id,
+          primary_color: setting.primary_color,
+          secondary_color: setting.secondary_color,
+          tertiary_color: setting.tertiary_color,
+          app_name: setting.app_name,
+          logo_url: setting.logo_url
+        }
+      end
 
-      # CORREÇÃO: Ajustar user_params para SuperUser
       def user_params
         case current_user
         when MasterUser
