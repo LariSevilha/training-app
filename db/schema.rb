@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_08_01_015537) do
+ActiveRecord::Schema[7.2].define(version: 2025_08_03_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -81,7 +81,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_01_015537) do
     t.string "app_name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.bigint "master_user_id", null: false
+    t.bigint "master_user_id"
     t.index ["master_user_id"], name: "index_dashboard_settings_on_master_user_id"
   end
 

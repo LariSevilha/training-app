@@ -2,8 +2,8 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       get 'dashboard/current_user_profile', to: 'dashboard#current_user_profile'
-      put 'dashboard/update_current_user', to: 'dashboard#update_current_user' # Add this
-      put 'dashboard/change_password', to: 'dashboard#change_password' # Add this
+      put 'dashboard/update_current_user', to: 'dashboard#update_current_user'
+      put 'dashboard/change_password', to: 'dashboard#change_password'
       post 'super_users', to: 'super_users#create'
       resources :master_users, only: [:index, :create, :show, :update, :destroy]
       get '/master_user', to: 'master_users#current_master'
@@ -26,7 +26,8 @@ Rails.application.routes.draw do
           post :unblock
         end
       end
-      resources :planilhas, only: [:show]
+      resources :planilhas, only: [:show] # Keep for specific planilha access
+      get 'planilhas', to: 'planilhas#index' # Add for user-specific data
       resources :trainings, only: [:index, :create]
       resources :meals, only: [:index, :create]
     end

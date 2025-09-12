@@ -9,27 +9,39 @@ module Api
         user = User.find_by(email: session_params[:email]) ||
                MasterUser.find_by(email: session_params[:email]) ||
                SuperUser.find_by(email: session_params[:email])
-
+      
         if user&.authenticate(session_params[:password])
           device_id = session_params[:device_id] || request.headers['Device-ID'] || SecureRandom.hex(8)
-          
-          # Criar nova API key
-          api_key = user.api_keys.create!(
-            device_id: device_id, 
-            token: SecureRandom.hex(16), 
-            active: true
-          )
-
+      
+          # Check for existing ApiKey (active or inactive)
+          api_key = user.api_keys.find_by(device_id: device_id)
+      
+          if api_key
+            # If ApiKey exists, update it to be active with a new token
+            api_key.update!(
+              token: SecureRandom.hex(16),
+              active: true,
+              updated_at: Time.current
+            )
+          else
+            # Create new ApiKey if none exists
+            api_key = user.api_keys.create!(
+              device_id: device_id,
+              token: SecureRandom.hex(16),
+              active: true
+            )
+          end
+      
           # Determinar o role do usuário
           user_role = case user.class.name
-                     when 'SuperUser'
-                       'super'
-                     when 'MasterUser' 
-                       'master'
-                     else
-                       'user'
-                     end
-
+                      when 'SuperUser'
+                        'super'
+                      when 'MasterUser'
+                        'master'
+                      else
+                        'user'
+                      end
+      
           # Renderizar resposta no formato esperado pelo frontend
           render json: {
             api_key: api_key.token,
@@ -42,14 +54,14 @@ module Api
             message: 'Login bem-sucedido'
           }, status: :ok
         else
-          render json: { 
-            error: 'Email ou senha inválidos' 
+          render json: {
+            error: 'Email ou senha inválidos'
           }, status: :unauthorized
         end
       rescue StandardError => e
         Rails.logger.error "Erro no login: #{e.message}"
-        render json: { 
-          error: 'Erro interno do servidor' 
+        render json: {
+          error: 'Erro interno do servidor'
         }, status: :internal_server_error
       end
 

@@ -7,10 +7,7 @@ class DashboardSetting < ApplicationRecord
   validates :primary_color, presence: true, format: { with: /\A#[0-9A-Fa-f]{6}\z/ }
   validates :secondary_color, presence: true, format: { with: /\A#[0-9A-Fa-f]{6}\z/ }
   validates :tertiary_color, presence: true, format: { with: /\A#[0-9A-Fa-f]{6}\z/ }
-  validates :app_name, presence: true, length: { maximum: 100 }
-  
-  # Garantir que cada MasterUser tenha apenas uma configuração
-  validates :master_user_id, uniqueness: true, allow_nil: true
+  validates :app_name, presence: true, length: { maximum: 100 } 
   
   validate :logo_format
   
@@ -18,11 +15,11 @@ class DashboardSetting < ApplicationRecord
   def self.for_user(user)
     case user
     when MasterUser
-      # Buscar configuração específica do MasterUser ou usar a global
       user.dashboard_setting || global_setting
     when SuperUser
-      # SuperUser sempre usa configuração global
       global_setting
+    when User
+      user.master_user&.dashboard_setting || global_setting
     else
       global_setting
     end
