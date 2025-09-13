@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_08_03_120000) do
+ActiveRecord::Schema[7.2].define(version: 2025_09_12_222027) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -67,7 +67,6 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_03_120000) do
   create_table "comidas", force: :cascade do |t|
     t.string "name"
     t.string "amount"
-    t.integer "amount_meal_id"
     t.bigint "meal_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -83,6 +82,13 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_03_120000) do
     t.datetime "updated_at", null: false
     t.bigint "master_user_id"
     t.index ["master_user_id"], name: "index_dashboard_settings_on_master_user_id"
+  end
+
+  create_table "exercises", force: :cascade do |t|
+    t.string "name"
+    t.string "video"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "master_users", force: :cascade do |t|
@@ -116,6 +122,24 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_03_120000) do
     t.index ["email"], name: "index_super_users_on_email", unique: true
   end
 
+  create_table "training_exercise_sets", force: :cascade do |t|
+    t.bigint "training_exercise_id", null: false
+    t.integer "series_amount", null: false
+    t.integer "repeats_amount", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_exercise_id"], name: "index_training_exercise_sets_on_training_exercise_id"
+  end
+
+  create_table "training_exercises", force: :cascade do |t|
+    t.bigint "training_id", null: false
+    t.bigint "exercise_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["exercise_id"], name: "index_training_exercises_on_exercise_id"
+    t.index ["training_id"], name: "index_training_exercises_on_training_id"
+  end
+
   create_table "training_photos", force: :cascade do |t|
     t.bigint "training_id", null: false
     t.string "image_url"
@@ -128,13 +152,8 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_03_120000) do
     t.bigint "user_id", null: false
     t.integer "weekday", default: 0, null: false
     t.text "description"
-    t.string "photo"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "serie_amount"
-    t.string "repeat_amount"
-    t.string "exercise_name"
-    t.string "video"
     t.index ["user_id"], name: "index_trainings_on_user_id"
   end
 
@@ -181,6 +200,9 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_03_120000) do
   add_foreign_key "comidas", "meals"
   add_foreign_key "dashboard_settings", "master_users"
   add_foreign_key "meals", "users"
+  add_foreign_key "training_exercise_sets", "training_exercises"
+  add_foreign_key "training_exercises", "exercises"
+  add_foreign_key "training_exercises", "trainings"
   add_foreign_key "training_photos", "trainings"
   add_foreign_key "trainings", "users"
   add_foreign_key "users", "master_users"

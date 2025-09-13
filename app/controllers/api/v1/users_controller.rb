@@ -1,25 +1,51 @@
 class Api::V1::UsersController < ApplicationController
   before_action :ensure_master_user_access, only: [:create]
-  before_action :set_user, only: [:show, :update, :destroy]
+  before_action :set_user, only: [:show, :update, :destroy, :unblock]
 
   def index
-    users = User.includes(:trainings, :weekly_pdfs, meals: :comidas)
+    users = User.includes(
+      trainings: { training_exercises: [:exercise, :training_exercise_sets] },
+      weekly_pdfs: [],
+      meals: :comidas
+    )
+    
     render json: users.as_json(
       only: [:id, :name, :email, :registration_date, :plan_type, :plan_duration],
       include: {
-        trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
-        weekly_pdfs: { only: [:id, :weekday, :pdf_url] },
-        meals: { only: [:id, :meal_type], include: { comidas: { only: [:id, :name, :amount] } } }
+        trainings: {
+          only: [:id, :description, :weekday],
+          include: {
+            training_exercises: {
+              only: [:id],
+              include: {
+                exercise: { only: [:id, :name, :video] },
+                training_exercise_sets: { only: [:id, :series_amount, :repeats_amount] }
+              }
+            }
+          }, 
+        },
+        weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
+        meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } }
       }
     ), status: :ok
   end
 
   def show
     render json: @user.as_json(
-      only: [:id, :name, :email, :registration_date, :plan_type, :plan_duration, :phone_number],
-      methods: [:photo_url],
+      only: [:id, :name, :email, :registration_date, :plan_type, :plan_duration, :phone_number], 
       include: {
-        trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
+        trainings: {
+          only: [:id, :description, :weekday],
+          include: {
+            training_exercises: {
+              only: [:id],
+              include: {
+                exercise: { only: [:id, :name, :video] },
+                training_exercise_sets: { only: [:id, :series_amount, :repeats_amount] }
+              }
+            }
+          }, 
+        },
         weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
         meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } }
       }
@@ -31,47 +57,24 @@ class Api::V1::UsersController < ApplicationController
   end
 
   def create
-    # Ensure we have a master user creating this user
-    unless current_user&.is_a?(MasterUser)
-      render json: { error: 'Acesso não autorizado' }, status: :unauthorized
-      return
-    end
-
-    user = User.new(user_params.merge(master_user_id: current_user.id))
-    Rails.logger.info "Parâmetros recebidos: #{user_params.inspect}"
+    @user = User.new(user_params)
     
-    if user.save 
-      render json: user.as_json(
-        only: [:id, :name, :email, :registration_date, :plan_type, :plan_duration, :phone_number],
-        methods: [:photo_url],
-        include: {
-          trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
-          weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
-          meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } }
-        }
-      ), status: :created
+    # Process training_exercises to create exercises if necessary
+    process_training_exercises(user_params[:trainings_attributes]) if user_params[:trainings_attributes].present?
+    
+    if @user.save
+      render json: @user, status: :created
     else
-      Rails.logger.error "Erros ao salvar: #{user.errors.full_messages}"
-      render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
+      Rails.logger.error "Errors when saving: #{@user.errors.full_messages}"
+      render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
     end
   end
 
   def update
     attributes = user_params
-    
-    # Handle weekly PDFs
-    if attributes[:weekly_pdfs_attributes].present?
-      attributes[:weekly_pdfs_attributes].each do |_, pdf_attrs|
-        if pdf_attrs[:id].present?
-          pdf = @user.weekly_pdfs.find_by(id: pdf_attrs[:id])
-          if pdf_attrs[:_destroy] == 'true'
-            pdf&.pdf&.purge
-          elsif pdf_attrs[:pdf].present?
-            pdf&.pdf&.attach(pdf_attrs[:pdf])
-          end
-        end
-      end
-    end
+
+    # Process training_exercises to create exercises if necessary
+    process_training_exercises(attributes[:trainings_attributes]) if attributes[:trainings_attributes].present?
 
     # Handle training photos
     if attributes[:trainings_attributes].present?
@@ -100,13 +103,24 @@ class Api::V1::UsersController < ApplicationController
         only: [:id, :name, :email, :registration_date, :expiration_date, :plan_type, :plan_duration, :phone_number],
         methods: [:photo_url],
         include: {
-          trainings: { only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday], methods: [:photo_urls] },
+          trainings: {
+            only: [:id, :description, :weekday],
+            include: {
+              training_exercises: {
+                only: [:id],
+                include: {
+                  exercise: { only: [:id, :name, :video] },
+                  training_exercise_sets: { only: [:id, :series_amount, :repeats_amount] }
+                }
+              }
+            },
+          },
           weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] },
           meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } }
         }
       ), status: :ok
     else
-      Rails.logger.error "Erros ao atualizar: #{@user.errors.full_messages}"
+      Rails.logger.error "Errors when updating: #{@user.errors.full_messages}"
       render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
     end
   end
@@ -114,12 +128,12 @@ class Api::V1::UsersController < ApplicationController
   def destroy
     @user.photo.purge if @user.photo.attached?
     @user.destroy
-    render json: { message: 'Usuário deletado com sucesso' }, status: :ok
+    render json: { message: 'User deleted successfully' }, status: :ok
   end
 
   def unblock
     @user.unblock_account!
-    render json: { message: 'Conta desbloqueada' }, status: :ok
+    render json: { message: 'Account unblocked' }, status: :ok
   end
 
   def planilha
@@ -127,10 +141,10 @@ class Api::V1::UsersController < ApplicationController
     if user && !user.blocked
       if user.expired?
         user.block_account!
-        render json: { error: 'Conta expirada. Entre em contato com o administrador.' }, status: :unauthorized
+        render json: { error: 'Expired account. Contact the administrator.' }, status: :unauthorized
         return
       end
-  
+
       response_data = {
         id: user.id,
         name: user.name,
@@ -142,19 +156,30 @@ class Api::V1::UsersController < ApplicationController
         photo_url: user.photo.attached? ? url_for(user.photo) : nil,
         error: nil,
         trainings: user.trainings.as_json(
-          only: [:id, :serie_amount, :repeat_amount, :exercise_name, :video, :description, :weekday],
-          methods: [:photo_urls]
+          only: [:id, :description, :weekday],
+          include: {
+            training_exercises: {
+              only: [:id],
+              include: {
+                exercise: { only: [:id, :name, :video] },
+                training_exercise_sets: { only: [:id, :series_amount, :repeats_amount] }
+              }
+            }
+          }, 
         ),
         meals: user.meals.as_json(
           only: [:id, :meal_type, :weekday],
           include: { comidas: { only: [:id, :name, :amount] } }
         ),
-        weekly_pdfs: user.weekly_pdfs.as_json(only: [:id, :weekday, :pdf_url], methods: [:pdf_filename])
+        weekly_pdfs: user.weekly_pdfs.as_json(
+          only: [:id, :weekday, :pdf_url],
+          methods: [:pdf_filename]
+        )
       }
-  
+
       render json: response_data, status: :ok
     else
-      render json: { error: 'Acesso não autorizado' }, status: :unauthorized
+      render json: { error: 'Unauthorized access' }, status: :unauthorized
     end
   end
 
@@ -163,48 +188,81 @@ class Api::V1::UsersController < ApplicationController
   def set_user
     @user = User.find(params[:id])
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Usuário não encontrado' }, status: :not_found and return
+    render json: { error: 'User not found' }, status: :not_found
   end
 
   def ensure_master_user_access
     unless current_user&.is_a?(MasterUser)
-      render json: { error: 'Acesso não autorizado' }, status: :unauthorized
+      render json: { error: 'Unauthorized access' }, status: :unauthorized
       return false
     end
     true
   end
 
+  def process_training_exercises(trainings_attributes)
+    return unless trainings_attributes.is_a?(Array) || trainings_attributes.is_a?(Hash)
+    
+    trainings_attributes.each do |key, training_attrs|
+      training_attrs = training_attrs.is_a?(Hash) ? training_attrs : training_attrs
+      next unless training_attrs[:training_exercises_attributes]
+      
+      training_attrs[:training_exercises_attributes].each do |ex_key, exercise_attrs|
+        exercise_attrs = exercise_attrs.is_a?(Hash) ? exercise_attrs : exercise_attrs
+        next if exercise_attrs[:_destroy] == 'true' || exercise_attrs[:_destroy] == true
+        
+        if exercise_attrs[:exercise_name].present?
+          # Find or create exercise
+          exercise = Exercise.find_or_create_by(
+            name: exercise_attrs[:exercise_name]
+          ) do |e|
+            e.video = exercise_attrs[:video] if exercise_attrs[:video].present?
+          end
+          
+          exercise_attrs[:exercise_id] = exercise.id
+          # Remove exercise_name and video as they are not TrainingExercise model attributes
+          exercise_attrs.delete(:exercise_name)
+          exercise_attrs.delete(:video)
+        end
+      end
+    end
+  end
+
   def user_params
     params.require(:user).permit(
-      :name, :email, :password, :registration_date, :plan_type, :plan_duration, :phone_number,
-      :photo,
+      :name, :email, :password, :phone_number, :plan_type, :plan_duration, 
+      :registration_date, :expiration_date, :photo,
       trainings_attributes: [
-        :id, :serie_amount, :repeat_amount, :exercise_name, :video, :weekday, :description, :_destroy,
-        photos: []
+        :id, :weekday, :description, :_destroy,
+        training_exercises_attributes: [
+          :id, :exercise_id, :exercise_name, :video, :_destroy,
+          training_exercise_sets_attributes: [
+            :id, :series_amount, :repeats_amount, :_destroy
+          ]
+        ]
       ],
       meals_attributes: [
         :id, :meal_type, :weekday, :_destroy,
         comidas_attributes: [:id, :name, :amount, :_destroy]
       ],
       weekly_pdfs_attributes: [
-        :id, :weekday, :pdf, :_destroy
+        :id, :weekday, :pdf, :notes, :_destroy
       ]
     )
   end
 
   def notify_master_of_duplicate_login(user)
-    master = MasterUser.first # Ajustar conforme necessário
+    master = MasterUser.first
     return unless master
 
     if master.device_token.present?
       message = {
         token: master.device_token,
         notification: {
-          title: "Acesso Simultâneo Detectado",
-          body: "O usuário #{user.email} tentou fazer login em um novo dispositivo."
+          title: "Simultaneous Access Detected",
+          body: "User #{user.email} tried to login from a new device."
         }
       }
-      # Implementar envio de notificação, ex.: fcm.send([master.device_token], message)
+      # Implement notification sending, e.g.: fcm.send([master.device_token], message)
     end
   end
 end

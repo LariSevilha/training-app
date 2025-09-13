@@ -1,5 +1,5 @@
 class UserSerializer < ActiveModel::Serializer
-  attributes :id, :name, :email, :role, :phone_number, :cpf, :cref, :photo_url, :created_at, :updated_at
+  attributes :id, :name, :email, :phone_number, :cpf, :cref, :photo_url, :created_at, :updated_at 
   has_many :trainings, if: -> { object.is_a?(User) }
   has_many :meals, if: -> { object.is_a?(User) }
   has_many :weekly_pdfs, if: -> { object.is_a?(User) }

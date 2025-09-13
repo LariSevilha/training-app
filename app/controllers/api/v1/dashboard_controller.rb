@@ -225,7 +225,11 @@ module Api
       end
 
       def build_master_user_metrics
-        users = current_user.users
+        users = current_user.users.includes(
+          trainings: { training_exercises: [:exercise, :training_exercise_sets] },
+          meals: :comidas,
+          weekly_pdfs: []
+        )
         total_users = users.count
         active_users = users.joins(:api_keys).where(api_keys: { active: true }).distinct.count
       
@@ -244,7 +248,27 @@ module Api
           duration_stats: users.group(:plan_duration).count,
           blocked_users: blocked_users,
           users_with_trainings: users.joins(:trainings).distinct.count,
-          users_with_meals: users.joins(:meals).distinct.count
+          users_with_meals: users.joins(:meals).distinct.count,
+          users: users.as_json(
+            only: [:id, :name, :email, :registration_date, :plan_type, :plan_duration],
+            include: {
+              trainings: {
+                only: [:id, :description, :weekday],
+                include: {
+                  training_exercises: {
+                    only: [:id],
+                    include: {
+                      exercise: { only: [:id, :name, :video] },
+                      training_exercise_sets: { only: [:id, :series_amount, :repeats_amount] }
+                    }
+                  }
+                },
+                methods: [:photo_urls]
+              },
+              meals: { only: [:id, :meal_type, :weekday], include: { comidas: { only: [:id, :name, :amount] } } },
+              weekly_pdfs: { only: [:id, :weekday, :pdf_url], methods: [:pdf_filename] }
+            }
+          )
         }
       end
       

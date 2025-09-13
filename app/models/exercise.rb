@@ -1,5 +1,4 @@
 class Exercise < ApplicationRecord
-  has_many :trainings, dependent: :destroy
-
-  validates :name, presence: true
+  has_many :training_exercises, dependent: :destroy
+  has_many :trainings, through: :training_exercises
 end
