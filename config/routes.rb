@@ -6,6 +6,7 @@ Rails.application.routes.draw do
       put 'dashboard/change_password', to: 'dashboard#change_password'
       post 'super_users', to: 'super_users#create'
       resources :master_users, only: [:index, :create, :show, :update, :destroy]
+      resources :exercises
       get '/master_user', to: 'master_users#current_master'
       put '/master_user/:id', to: 'master_users#update'
       post 'users/sign_in', to: 'sessions#create', as: :user_login
@@ -21,6 +22,7 @@ Rails.application.routes.draw do
           post :unblock
           patch :recalculate_expiration
           patch :renew_plan
+          resources :trainings
         end
         member do
           post :unblock
